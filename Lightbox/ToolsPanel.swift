@@ -164,7 +164,10 @@ struct ToolsPanel: View {
             }
         }
         .disabled(editor.layer == nil || editor.isBusy)
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
+        .padding(.top, 26)   // just below the close/minimise buttons that fade in on hover
+        .ignoresSafeArea(.container, edges: .top)
         .frame(width: 320)
         .fixedSize(horizontal: false, vertical: true)
     }

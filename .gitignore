@@ -7,3 +7,5 @@ tools/.venv/
 tools/cache/
 Lightbox/Models/*.mlpackage
 __pycache__/
+build-*/
+*.xcworkspace/xcuserdata/

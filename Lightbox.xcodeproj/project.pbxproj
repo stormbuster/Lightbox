@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0B2F5E37ACA07E3B52AE9EC5 /* ToolsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28AD9677F343321B9A56669 /* ToolsPanel.swift */; };
 		12C349D1CBA3A7FB44DE1BE8 /* RealESRGAN_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */; };
+		2A1C9543FD0F96B534E824E4 /* WindowChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB48954AE2CF2BDC524212E0 /* WindowChrome.swift */; };
 		57CAA69D9E73B4075D94ACC8 /* PhotoIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E442D36436F2B39D56C1EB21 /* PhotoIO.swift */; };
 		58BA1E366F3011E9DFA984CE /* ViTMatte_Base_1024.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */; };
 		608283A26A218A730254A524 /* LightboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */; };
@@ -41,6 +42,7 @@
 		8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightboxApp.swift; sourceTree = "<group>"; };
 		A28AD9677F343321B9A56669 /* ToolsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsPanel.swift; sourceTree = "<group>"; };
 		AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		AB48954AE2CF2BDC524212E0 /* WindowChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowChrome.swift; sourceTree = "<group>"; };
 		CC6FACA52E482AE00CF9DFF2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D4BCF37F596B36103F8E541D /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
 		DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShootingInfo.swift; sourceTree = "<group>"; };
@@ -87,6 +89,7 @@
 				D4BCF37F596B36103F8E541D /* SelfTest.swift */,
 				DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */,
 				A28AD9677F343321B9A56669 /* ToolsPanel.swift */,
+				AB48954AE2CF2BDC524212E0 /* WindowChrome.swift */,
 				34994535DBA27C677C9E9908 /* Models */,
 			);
 			path = Lightbox;
@@ -183,6 +186,7 @@
 				F747487C6BFED2FDA707F0DA /* ShootingInfo.swift in Sources */,
 				0B2F5E37ACA07E3B52AE9EC5 /* ToolsPanel.swift in Sources */,
 				58BA1E366F3011E9DFA984CE /* ViTMatte_Base_1024.mlpackage in Sources */,
+				2A1C9543FD0F96B534E824E4 /* WindowChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

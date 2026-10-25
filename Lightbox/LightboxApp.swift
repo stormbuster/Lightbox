@@ -96,10 +96,14 @@ struct LightboxApp: App {
             }
         }
 
-        UtilityWindow("Tools", id: "tools") {
+        Window("Tools", id: "tools") {
             ToolsPanel()
                 .environment(editor)
+                .background(WindowChrome(buttons: [.closeButton, .miniaturizeButton], floating: true, glass: true))
+                .containerBackground(for: .window) { GlassBackground() }   // fills the whole window, title-bar strip included
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
         .defaultWindowPlacement { _, context in
             let screen = context.defaultDisplay.visibleRect
             return WindowPlacement(CGPoint(x: screen.maxX - 340, y: screen.minY + 80))
