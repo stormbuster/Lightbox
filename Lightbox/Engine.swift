@@ -47,6 +47,16 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Default share of the original's fine texture added back after upscaling (see `Engine.retainTexture`):
+    /// Fast smooths grain and skin into plastic, Restore redraws grain itself, Faithful keeps everything already.
+    var defaultTexture: Double {
+        switch self {
+        case .realESRGAN: 0.7
+        case .bhiDAT2: 0.2
+        default: 0
+        }
+    }
+
     /// Measured on M5 Pro: DAT2's window attention takes 70 s/tile on the Neural Engine vs 0.48 s on the GPU;
     /// Real-ESRGAN is fastest on the Neural Engine (0.13 s vs 0.22 s per 256 px tile).
     var computeUnits: MLComputeUnits {
@@ -78,6 +88,8 @@ nonisolated struct Layer: Sendable {
     var rgb: CGImage
     var mask: CGImage?
     var preview: CGImage
+    /// The composite at full resolution, for the 100 % view.
+    var full: CGImage
 
     var pixelSize: CGSize { CGSize(width: rgb.width, height: rgb.height) }
 }
@@ -403,6 +415,48 @@ actor Engine {
         return out
     }
 
+    /// Texture retention: AI upscalers treat fine grain and skin texture as noise and smooth it away ("plastic"). This
+    /// adds the original's own fine detail, enlarged to the new size, back on top: out = ai + amount × (up − blur(up)),
+    /// where up is a Lanczos enlargement of the original. Processed in horizontal strips, so memory stays bounded.
+    nonisolated func retainTexture(ai: CGImage, original: CGImage, amount: Double) throws -> CGImage {
+        guard amount > 0 else { return ai }
+        let (w, h) = (ai.width, ai.height)
+        let space = workingSpace(ai)
+        let factor = Double(w) / Double(original.width)
+        let up = CIImage(cgImage: original).applyingFilter("CILanczosScaleTransform", parameters: [
+            kCIInputScaleKey: factor, kCIInputAspectRatioKey: Double(w) / Double(original.width) / factor,
+        ]).cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+        let low = up.clampedToExtent().applyingGaussianBlur(sigma: max(0.8, factor * 0.8)).cropped(to: up.extent)
+        let aiImage = CIImage(cgImage: ai)
+
+        guard let canvas = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4, space: space,
+                                     bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
+              let base = canvas.data?.assumingMemoryBound(to: UInt8.self) else { throw EngineError.render }
+        let strip = 256
+        let k = Float(amount)
+        var top = 0
+        while top < h {
+            try Task.checkCancellation()
+            let rows = min(strip, h - top)
+            let bounds = CGRect(x: 0, y: h - top - rows, width: w, height: rows)   // Core Image y runs upwards
+            let n = w * rows * 4
+            var a = [Float](repeating: 0, count: n), u = [Float](repeating: 0, count: n), l = [Float](repeating: 0, count: n)
+            a.withUnsafeMutableBytes { context.render(aiImage, toBitmap: $0.baseAddress!, rowBytes: w * 16, bounds: bounds, format: .RGBAf, colorSpace: space) }
+            u.withUnsafeMutableBytes { context.render(up, toBitmap: $0.baseAddress!, rowBytes: w * 16, bounds: bounds, format: .RGBAf, colorSpace: space) }
+            l.withUnsafeMutableBytes { context.render(low, toBitmap: $0.baseAddress!, rowBytes: w * 16, bounds: bounds, format: .RGBAf, colorSpace: space) }
+            var out = vDSP.add(a, vDSP.multiply(k, vDSP.subtract(u, l)))
+            vDSP.clip(out, to: 0...1, result: &out)
+            vDSP.multiply(255, out, result: &out)
+            // Bitmap rows run top-down, matching render(toBitmap:); alpha is ignored (noneSkipLast).
+            out.withUnsafeBufferPointer { src in
+                vDSP_vfixru8(src.baseAddress!, 1, base + top * w * 4, 1, vDSP_Length(n))
+            }
+            top += rows
+        }
+        guard let image = canvas.makeImage() else { throw EngineError.render }
+        return image
+    }
+
     // MARK: Compositing
 
     /// The visible image: colour with the matte applied as alpha (or the colour alone).
@@ -525,6 +579,6 @@ actor Engine {
             guard let small = context.createCGImage(image, from: extent, format: .RGBA8, colorSpace: workingSpace(full)) else { throw EngineError.render }
             preview = small
         }
-        return Layer(rgb: rgb, mask: mask, preview: preview)
+        return Layer(rgb: rgb, mask: mask, preview: preview, full: full)
     }
 }

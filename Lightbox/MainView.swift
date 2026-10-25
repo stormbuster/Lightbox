@@ -20,7 +20,12 @@ struct MainView: View {
         ZStack {
             Color.black
 
-            if let preview = editor.displayedPreview {
+            if editor.isZoomed, let layer = editor.layer {
+                ActualPixels(after: layer.full, before: editor.original?.full, center: editor.zoomCenter,
+                             showBefore: editor.showOriginal, split: isSplit ? editor.splitPosition : nil,
+                             hasAlpha: layer.mask != nil,
+                             backdrop: editor.backdrop == .color ? NSColor(editor.backdropColor) : nil)
+            } else if let preview = editor.displayedPreview {
                 ZStack {
                     if editor.layer?.mask != nil && !editor.showOriginal {
                         if editor.backdrop == .color { editor.backdropColor } else { Checkerboard() }
@@ -66,14 +71,18 @@ struct MainView: View {
             }
         }
         .edgesIgnoringSafeArea(.all)
-        .overlay(DropDragView.Representable(isTargeted: $isTargeted) { urls in
+        .overlay(DropDragView.Representable(isTargeted: $isTargeted, onDrop: { urls in
             editor.load(urls.first!)
-        })
+        }, onDoubleClick: { point, viewSize in
+            editor.toggleZoom(at: imagePoint(point, in: viewSize))
+        }, onPan: { delta in
+            editor.pan(by: delta)
+        }, isZoomed: { editor.isZoomed }))
         .overlay {
             // Above the window-drag layer so the handle receives the drag.
             if isSplit, let preview = editor.displayedPreview {
                 SplitHandle(position: Bindable(editor).splitPosition,
-                            aspect: CGFloat(preview.width) / CGFloat(preview.height))
+                            aspect: editor.isZoomed ? nil : CGFloat(preview.width) / CGFloat(preview.height))
             }
         }
         .onChange(of: editor.documentID) {
@@ -87,6 +96,15 @@ struct MainView: View {
         } message: {
             Text(editor.errorMessage ?? "")
         }
+    }
+
+    /// A point in the window (top-left origin) as image pixels of the displayed layer, for zooming in on it.
+    private func imagePoint(_ point: CGPoint, in viewSize: CGSize) -> CGPoint? {
+        guard let size = editor.layer?.pixelSize, size.width > 0, size.height > 0 else { return nil }
+        let scale = min(viewSize.width / size.width, viewSize.height / size.height)
+        let origin = CGPoint(x: (viewSize.width - size.width * scale) / 2, y: (viewSize.height - size.height * scale) / 2)
+        return CGPoint(x: min(max((point.x - origin.x) / scale, 0), size.width),
+                       y: min(max((point.y - origin.y) / scale, 0), size.height))
     }
 
     /// Give the borderless window the photo's aspect ratio, as large as fits on screen.
@@ -108,6 +126,11 @@ struct MainView: View {
 final class DropDragView: NSView {
     var onDrop: (([URL]) -> Void)?
     var onTargeted: ((Bool) -> Void)?
+    /// Double-click location (top-left origin, points) and the view size.
+    var onDoubleClick: ((CGPoint, CGSize) -> Void)?
+    /// Pan by a distance in image pixels (at 100 %).
+    var onPan: ((CGPoint) -> Void)?
+    var isZoomed: () -> Bool = { false }
 
     private static let imageTypes = [UTType.image.identifier]
 
@@ -119,7 +142,24 @@ final class DropDragView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func mouseDown(with event: NSEvent) {
-        window?.performDrag(with: event)
+        if event.clickCount == 2 {
+            let p = convert(event.locationInWindow, from: nil)
+            onDoubleClick?(CGPoint(x: p.x, y: bounds.height - p.y), bounds.size)
+        } else if !isZoomed() {
+            window?.performDrag(with: event)   // at 100 % a drag pans instead (mouseDragged)
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard isZoomed() else { return }
+        let scale = window?.backingScaleFactor ?? 2
+        onPan?(CGPoint(x: event.deltaX * scale, y: event.deltaY * scale))
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard isZoomed() else { return super.scrollWheel(with: event) }
+        let scale = (window?.backingScaleFactor ?? 2) * (event.hasPreciseScrollingDeltas ? 1 : 10)
+        onPan?(CGPoint(x: event.scrollingDeltaX * scale, y: event.scrollingDeltaY * scale))
     }
 
     // The traffic-light buttons stay out of the way and fade in while the cursor is over the window.
@@ -184,16 +224,22 @@ final class DropDragView: NSView {
     struct Representable: NSViewRepresentable {
         @Binding var isTargeted: Bool
         let onDrop: ([URL]) -> Void
+        let onDoubleClick: (CGPoint, CGSize) -> Void
+        let onPan: (CGPoint) -> Void
+        let isZoomed: () -> Bool
 
         func makeNSView(context: Context) -> DropDragView {
             let view = DropDragView()
-            view.onDrop = onDrop
             view.onTargeted = { isTargeted = $0 }
+            updateNSView(view, context: context)
             return view
         }
 
         func updateNSView(_ nsView: DropDragView, context: Context) {
             nsView.onDrop = onDrop
+            nsView.onDoubleClick = onDoubleClick
+            nsView.onPan = onPan
+            nsView.isZoomed = isZoomed
         }
     }
 }
@@ -202,7 +248,8 @@ final class DropDragView: NSView {
 /// The draggable before/after line, drawn over the photo's fitted frame.
 struct SplitHandle: View {
     @Binding var position: CGFloat
-    let aspect: CGFloat
+    /// The photo's aspect ratio when fitted; nil when it fills the window (100 % view).
+    let aspect: CGFloat?
 
     var body: some View {
         GeometryReader { geo in
@@ -236,6 +283,7 @@ struct SplitHandle: View {
     }
 
     private func fitted(in size: CGSize) -> CGRect {
+        guard let aspect else { return CGRect(origin: .zero, size: size) }
         let scale = min(size.width / aspect, size.height)
         let (w, h) = (scale * aspect, scale)
         return CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h)
@@ -250,6 +298,80 @@ private extension Text {
             .padding(.horizontal, 8).padding(.vertical, 3)
             .background(.black.opacity(0.45), in: Capsule())
             .allowsHitTesting(false)
+    }
+}
+
+
+/// The 100 % view: draws only the visible part of the full-resolution image, one image pixel per screen pixel,
+/// with the original (scaled to the same geometry) for before/after.
+struct ActualPixels: NSViewRepresentable {
+    let after: CGImage
+    let before: CGImage?
+    let center: CGPoint
+    let showBefore: Bool
+    let split: CGFloat?
+    let hasAlpha: Bool
+    let backdrop: NSColor?
+
+    func makeNSView(context: Context) -> Canvas { Canvas() }
+
+    func updateNSView(_ view: Canvas, context: Context) {
+        view.model = self
+        view.needsDisplay = true
+    }
+
+    final class Canvas: NSView {
+        var model: ActualPixels?
+
+        private static let checker: NSColor = {
+            let tile = NSImage(size: NSSize(width: 24, height: 24), flipped: false) { rect in
+                NSColor(white: 0.85, alpha: 1).setFill(); rect.fill()
+                NSColor(white: 0.65, alpha: 1).setFill()
+                NSRect(x: 0, y: 0, width: 12, height: 12).fill(); NSRect(x: 12, y: 12, width: 12, height: 12).fill()
+                return true
+            }
+            return NSColor(patternImage: tile)
+        }()
+
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor.black.setFill()
+            bounds.fill()
+            guard let m = model, let ctx = NSGraphicsContext.current?.cgContext else { return }
+            let scale = window?.backingScaleFactor ?? 2
+            let (w, h) = (CGFloat(m.after.width), CGFloat(m.after.height))
+            // Image rectangle in view points (y up), positioned so `center` sits in the middle of the view.
+            let imageRect = CGRect(x: bounds.midX - m.center.x / scale, y: bounds.midY - (h - m.center.y) / scale,
+                                   width: w / scale, height: h / scale)
+            let visible = imageRect.intersection(bounds)
+            guard !visible.isEmpty else { return }
+            // The same area in image pixels (top-left origin).
+            let px = CGRect(x: (visible.minX - imageRect.minX) * scale, y: (imageRect.maxY - visible.maxY) * scale,
+                            width: visible.width * scale, height: visible.height * scale).integral
+
+            func draw(_ image: CGImage, quality: CGInterpolationQuality, clip: CGRect? = nil) {
+                let ratio = CGFloat(image.width) / w
+                let src = CGRect(x: px.minX * ratio, y: px.minY * ratio, width: px.width * ratio, height: px.height * ratio).integral
+                guard let piece = image.cropping(to: src) else { return }
+                ctx.saveGState()
+                if let clip { ctx.clip(to: clip) }
+                ctx.interpolationQuality = quality
+                ctx.draw(piece, in: visible)
+                ctx.restoreGState()
+            }
+
+            if m.showBefore, let before = m.before {
+                draw(before, quality: .high)
+                return
+            }
+            if m.hasAlpha {
+                (m.backdrop ?? Self.checker).setFill()
+                visible.fill()
+            }
+            draw(m.after, quality: .none)
+            if let split = m.split, let before = m.before {
+                draw(before, quality: .high, clip: CGRect(x: 0, y: 0, width: bounds.width * split, height: bounds.height))
+            }
+        }
     }
 }
 

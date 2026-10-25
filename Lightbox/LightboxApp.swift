@@ -88,6 +88,10 @@ struct LightboxApp: App {
                 Button(editor.splitCompare ? "Hide Before/After Split" : "Before/After Split") { editor.splitCompare.toggle() }
                     .keyboardShortcut("\\", modifiers: .command)
                     .disabled(!editor.isModified)
+                Divider()
+                Button(editor.isZoomed ? "Fit to Window" : "Actual Size (100 %)") { editor.toggleZoom(at: nil) }
+                    .keyboardShortcut("1")
+                    .disabled(editor.layer == nil)
             }
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") { editor.undo() }.keyboardShortcut("z")

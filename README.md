@@ -10,13 +10,16 @@ Core ML on the Apple silicon GPU and Neural Engine.
 - **Drop a photo** anywhere on the borderless window (from Finder, Photos or any app), use Finder's
   Open With › Lightbox, or press ⌘O. The window takes the photo's proportions and the Tools panel opens beside it.
   Both windows drag from anywhere; their buttons appear while the cursor is over them.
+- **Two steps, like layers**: *Upscale* first, then *Background*. Each keeps its result and has an eye toggle to hide or
+  show it instantly; background removal runs on the upscaled image when it is visible, which keeps more hair strands.
 - **Remove Background**: *Soft edges* (people, animals, hair, fur, motion and focus blur) or *Crisp edges* (products
   and objects). Preview the cutout on transparency or on any colour; the eyedropper picks one from anywhere on screen.
 - **Upscale** 2×, 3× or 4×: *Restore* for JPEG and HEIC (removes compression blocks and noise), *Faithful* for RAW,
-  TIFF and PNG originals, *Fast* on the Neural Engine. Cutouts stay cutouts: the colour goes through the model, the
-  matte through a smooth resampler.
+  TIFF and PNG originals, *Fast* on the Neural Engine. A *Texture* slider adds the original's own grain and skin texture
+  back at the new size, so people don't turn plastic (defaults: Fast 70 %, Restore 20 %, Faithful 0 %).
 - **Compare**: *Original* shows the unedited photo (`\`), *Split* puts a before/after line on the photo that you drag
-  across it (`⌘\`). Undo and Revert step back.
+  across it (`⌘\`), *100%* shows actual pixels (`⌘1`, or double-click the photo where you want to look; drag or scroll
+  to move around). Both comparisons work at 100 %. Undo and Revert step back.
 - **Save As** PNG, TIFF, JPEG or HEIC, keeping EXIF, GPS and IPTC metadata, or as a **layered PSD**: the subject
   with the cutout as an editable layer mask over the hidden original photo, so the mask can be refined with a brush in
   Photoshop, Affinity, Pixelmator or Photopea. Cutouts keep their transparency (JPEG, which has none, is saved on white).
@@ -83,6 +86,10 @@ A 20 MP photo takes about 3 s, in stages (`Lightbox/Engine.swift`):
    background remains.
 
 ## How upscaling works
+
+Texture retention: the AI result plus a share of the original's fine detail, enlarged with Lanczos to the new size
+(`out = ai + k × (up − blur(up))`, `Engine.retainTexture`), applied when the image is composed, so moving the slider
+doesn't re-run the model.
 
 The photo is cut into 256 px tiles that overlap by 16 px; each tile is upscaled 4× and only its centre is kept, so seams
 don't show. For 2× and 3× each tile is resampled with Lanczos before it is placed. Larger tiles gave no speed-up on the

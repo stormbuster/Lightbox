@@ -23,11 +23,25 @@ enum SelfTest {
             // `--demo-cutout`: once a photo is open, remove its background and show the before/after split.
             if args.contains("--demo-cutout") {
                 while editor?.layer == nil || editor?.isBusy == true { try? await Task.sleep(for: .milliseconds(200)) }
+                // `--demo-upscale`: upscale 2x (fast model) first, so the cutout runs on the upscaled image.
+                if args.contains("--demo-upscale") {
+                    editor?.upscaleModel = .realESRGAN
+                    editor?.upscaleTexture = AIModel.realESRGAN.defaultTexture
+                    editor?.upscaleFactor = 2
+                    editor?.upscale()
+                    try? await Task.sleep(for: .milliseconds(300))
+                    while editor?.isBusy == true { try? await Task.sleep(for: .milliseconds(200)) }
+                }
                 editor?.removeBackground()
                 try? await Task.sleep(for: .milliseconds(300))
                 while editor?.isBusy == true { try? await Task.sleep(for: .milliseconds(200)) }
                 editor?.splitPosition = 0.45
                 editor?.splitCompare = true
+                // `--demo-zoom x,y`: then switch to the 100 % view centred on that point (fractions of the photo).
+                if let z = args.firstIndex(of: "--demo-zoom"), z + 1 < args.count, let size = editor?.layer?.pixelSize {
+                    let f = args[z + 1].split(separator: ",").compactMap { Double($0) }
+                    editor?.toggleZoom(at: CGPoint(x: size.width * f[0], y: size.height * f[1]))
+                }
                 try? await Task.sleep(for: .seconds(1))
             } else {
                 try? await Task.sleep(for: .seconds(10))
@@ -73,6 +87,12 @@ enum SelfTest {
                             try await engine.upscale(image, using: model, factor: factor) { _ in }
                         }
                         try PhotoIO.write(up, to: url.deletingPathExtension().appendingPathExtension("\(model.rawValue)-\(factor)x.png"), format: .png, metadata: metadata)
+                        if model.defaultTexture > 0 {
+                            let textured = try await time("  texture \(Int(model.defaultTexture * 100))%") {
+                                try engine.retainTexture(ai: up, original: image, amount: model.defaultTexture)
+                            }
+                            try PhotoIO.write(textured, to: url.deletingPathExtension().appendingPathExtension("\(model.rawValue)-\(factor)x-texture.png"), format: .png, metadata: metadata)
+                        }
                     }
                 }
                 print("selftest ok")
