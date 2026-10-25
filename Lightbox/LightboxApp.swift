@@ -67,7 +67,6 @@ struct LightboxApp: App {
                     newWindow.titlebarAppearsTransparent = true
                     newWindow.backgroundColor = .black
                     newWindow.contentAspectRatio = CGSize(width: 16, height: 9)
-                    DropDragView.setWindowButtons(of: newWindow, visible: false, animated: false)
                 }
                 .task { await Engine.shared.warmUp() }
                 .onAppear { appDelegate.attach(editor) }

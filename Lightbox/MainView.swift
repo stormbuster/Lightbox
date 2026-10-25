@@ -130,24 +130,16 @@ final class DropDragView: NSView {
                                        owner: self, userInfo: nil))
     }
 
-    override func mouseEntered(with event: NSEvent) {
-        if let window { Self.setWindowButtons(of: window, visible: true, animated: true) }
+    private var hover: WindowButtonHover?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        hover = WindowButtonHover(window: window, buttons: [.closeButton, .miniaturizeButton, .zoomButton])
     }
 
-    override func mouseExited(with event: NSEvent) {
-        if let window { Self.setWindowButtons(of: window, visible: false, animated: true) }
-    }
-
-    static func setWindowButtons(of window: NSWindow, visible: Bool, animated: Bool) {
-        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = animated ? 0.18 : 0
-            for button in buttons {
-                button.isHidden = false
-                button.animator().alphaValue = visible ? 1 : 0
-            }
-        }
-    }
+    override func mouseEntered(with event: NSEvent) { hover?.cursorEntered() }
+    override func mouseExited(with event: NSEvent) { hover?.cursorExited() }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let ok = canRead(sender.draggingPasteboard)

@@ -30,6 +30,7 @@ struct WindowChrome: NSViewRepresentable {
         var buttons: [NSWindow.ButtonType] = []
         var floating = false
         var glass = false
+        private var hover: WindowButtonHover?
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -50,7 +51,7 @@ struct WindowChrome: NSViewRepresentable {
             for type in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] where !buttons.contains(type) {
                 window.standardWindowButton(type)?.isHidden = true
             }
-            show(false, animated: false)
+            hover = WindowButtonHover(window: window, buttons: buttons)
         }
 
         override func updateTrackingAreas() {
@@ -60,14 +61,55 @@ struct WindowChrome: NSViewRepresentable {
                                            owner: self, userInfo: nil))
         }
 
-        override func mouseEntered(with event: NSEvent) { show(true, animated: true) }
-        override func mouseExited(with event: NSEvent) { show(false, animated: true) }
+        override func mouseEntered(with event: NSEvent) { hover?.cursorEntered() }
+        override func mouseExited(with event: NSEvent) { hover?.cursorExited() }
+    }
+}
 
-        private func show(_ visible: Bool, animated: Bool) {
-            guard let window else { return }
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = animated ? 0.18 : 0
-                for type in buttons { window.standardWindowButton(type)?.animator().alphaValue = visible ? 1 : 0 }
+
+/// Shows a window's traffic-light buttons while the cursor is over the window. Hover is judged against the whole
+/// window frame rather than the content view's tracking area: the buttons sit in the title bar above the content, so
+/// moving onto them would otherwise count as leaving and hide them under the cursor. While they are shown, a light
+/// poll catches the cursor leaving by way of the title bar, where the content view gets no exit event.
+@MainActor
+final class WindowButtonHover {
+    private weak var window: NSWindow?
+    private let buttons: [NSWindow.ButtonType]
+    private var poll: Timer?
+    private var shown = true
+
+    init(window: NSWindow, buttons: [NSWindow.ButtonType]) {
+        self.window = window
+        self.buttons = buttons
+        set(false, animated: false)
+    }
+
+    func cursorEntered() {
+        set(true, animated: true)
+        guard poll == nil else { return }
+        poll = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.check() }
+        }
+    }
+
+    func cursorExited() { check() }
+
+    private func check() {
+        guard let window, !window.frame.contains(NSEvent.mouseLocation) else { return }
+        poll?.invalidate()
+        poll = nil
+        set(false, animated: true)
+    }
+
+    private func set(_ show: Bool, animated: Bool) {
+        guard let window, show != shown else { return }
+        shown = show
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = animated ? 0.18 : 0
+            for type in buttons {
+                guard let button = window.standardWindowButton(type) else { continue }
+                button.isHidden = false
+                button.animator().alphaValue = show ? 1 : 0
             }
         }
     }
