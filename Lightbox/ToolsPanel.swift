@@ -4,10 +4,12 @@
 //
 
 import SwiftUI
+import AppKit
 
 
 struct ToolsPanel: View {
     @Environment(Editor.self) private var editor
+    @State private var sampler = NSColorSampler()
 
     var body: some View {
         @Bindable var editor = editor
@@ -44,6 +46,33 @@ struct ToolsPanel: View {
                             .frame(maxWidth: .infinity)
                     }
                     .controlSize(.large)
+                    Text("Preview backdrop").font(.caption).foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                    HStack(spacing: 8) {
+                        Picker("Preview backdrop", selection: $editor.backdrop) {
+                            ForEach(Backdrop.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        ColorPicker("Backdrop colour", selection: $editor.backdropColor, supportsOpacity: false)
+                            .labelsHidden()
+                            .onChange(of: editor.backdropColor) { editor.backdrop = .color }
+                        Button {
+                            let target = editor
+                            sampler.show { picked in
+                                guard let picked else { return }
+                                let color = Color(nsColor: picked)
+                                Task { @MainActor in
+                                    target.backdropColor = color
+                                    target.backdrop = .color
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "eyedropper")
+                        }
+                        .help("Pick a backdrop colour from anywhere on screen")
+                    }
+                    .disabled(editor.layer?.mask == nil)
                 }
                 .padding(4)
             } label: {

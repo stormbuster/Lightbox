@@ -165,7 +165,9 @@ actor Engine {
         #if DEBUG
         if ProcessInfo.processInfo.environment["LIGHTBOX_NOREFINE"] == "1" { return coarse }
         #endif
-        guard max(w, h) > tile * 5 / 4 else { return coarse }
+        guard max(w, h) > tile * 5 / 4 else {
+            return try grayImage(removeHaze(plane(of: coarse, bounds: extent), width: w, height: h), width: w, height: h)
+        }
         progress(0.1)
 
         var alpha = plane(of: coarse, bounds: extent)
@@ -220,7 +222,27 @@ actor Engine {
         if hair {
             alpha = try hairMatte(alpha, source: source, space: space, width: w, height: h, tuning: tuning, progress: progress)
         }
-        return try grayImage(alpha, width: w, height: h)
+        return try grayImage(removeHaze(alpha, width: w, height: h), width: w, height: h)
+    }
+
+    /// Matting models leave a faint, smooth alpha tail beyond soft edges; after colour decontamination it shows as a
+    /// skin-coloured glow. Fade alpha that is both faint and smooth, keep anything with strand-like local detail, and drop
+    /// specks that are not near the solid subject.
+    nonisolated private func removeHaze(_ alpha: [Float], width w: Int, height h: Int) -> [Float] {
+        let local = ForegroundEstimator.blur(alpha, w, h, 7)
+        let solid = alpha.map { $0 > 0.6 ? Float(1) : 0 }
+        let near = ForegroundEstimator.blur(solid, w, h, ForegroundEstimator.odd(Double(max(w, h)) * 0.0075))
+        var out = alpha
+        for i in 0..<alpha.count {
+            let a = alpha[i]
+            guard a > 0, a < 1 else { continue }
+            guard near[i] > 0.001 else { out[i] = 0; continue }
+            let t = min(max((a - 0.04) / 0.18, 0), 1)
+            let faint = t * t * (3 - 2 * t)                         // smoothstep(0.04, 0.22, a)
+            let strand = min(abs(a - local[i]) * 12, 1)               // fine hair deviates from its neighbourhood
+            out[i] = a * max(faint, strand)
+        }
+        return out
     }
 
     /// Stage 3, hair: ViTMatte computes exact partial transparency inside an "unknown" band of a trimap built from the

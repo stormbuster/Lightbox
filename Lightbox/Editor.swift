@@ -4,8 +4,15 @@
 //
 
 import AppKit
+import SwiftUI
 import Observation
 import UniformTypeIdentifiers
+
+
+enum Backdrop: String, CaseIterable, Identifiable {
+    case checkerboard = "Transparent", color = "Colour"
+    var id: String { rawValue }
+}
 
 
 @Observable
@@ -23,6 +30,9 @@ final class Editor {
     var errorMessage: String?
     var showOriginal = false
     var splitCompare = false
+    /// What shows behind a cutout in the preview (never saved).
+    var backdrop: Backdrop = .checkerboard
+    var backdropColor = Color.white
     var splitPosition: CGFloat = 0.5
     private(set) var shooting: ShootingInfo?
     private(set) var tuning = CutoutTuning.standard

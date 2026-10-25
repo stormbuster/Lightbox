@@ -28,6 +28,9 @@ A 20 MP photo takes ~9 s. EXIF (camera, lens, focal length, aperture, shutter, I
 picks Soft edges and widens the bands, deep focus picks Crisp edges, slow shutters allow for motion blur, and high
 sensor-size-adjusted ISO denoises the model input (never the saved pixels).
 
+A final clean-up fades alpha that is both faint and smooth (the haze matting models leave beyond soft edges, which
+becomes a skin-coloured glow after decontamination), keeps strand-like detail, and drops specks away from the subject.
+
 Cutouts get foreground colour estimation (blur fusion, Forest et al. 2021, as in BiRefNet's `refine_foreground`), so
 soft edges lose the background colour that otherwise shows as a dark or coloured outline; ~0.9 s for 13.5 MP on Accelerate.
 Core Image's CIGuidedFilter was tried for edge-aware matte upsampling and rejected (it washed out the matte).

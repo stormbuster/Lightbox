@@ -22,7 +22,9 @@ struct MainView: View {
 
             if let preview = editor.displayedPreview {
                 ZStack {
-                    if editor.layer?.mask != nil && !editor.showOriginal { Checkerboard() }
+                    if editor.layer?.mask != nil && !editor.showOriginal {
+                        if editor.backdrop == .color { editor.backdropColor } else { Checkerboard() }
+                    }
                     Image(decorative: preview, scale: 1)
                         .resizable()
                         .interpolation(.high)
