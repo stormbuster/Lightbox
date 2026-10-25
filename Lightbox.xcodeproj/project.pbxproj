@@ -13,6 +13,7 @@
 		58BA1E366F3011E9DFA984CE /* ViTMatte_Base_1024.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */; };
 		608283A26A218A730254A524 /* LightboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */; };
 		61232EE7EC3B0ADE67235F03 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 76FCD194792B63F7A3B3F808 /* Assets.xcassets */; };
+		71751179D7AE034AE5F807E4 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 68F5C46837A816AC104EBC67 /* AppIcon.icon */; };
 		863730A57A6775C85F9504FA /* BHI_DAT2_Real_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = EE0D651DB5F79381718A228B /* BHI_DAT2_Real_x4.mlpackage */; };
 		88327B4A673C6F92405AEEC1 /* ForegroundEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */; };
 		A37AAF2111F3F21B9949B047 /* BiRefNet_HR_2048.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 336171D542D9D56A9F0ABD95 /* BiRefNet_HR_2048.mlpackage */; };
@@ -33,6 +34,7 @@
 		4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
 		5B2633E77D58BDC72A943B51 /* Lightbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lightbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForegroundEstimator.swift; sourceTree = "<group>"; };
+		68F5C46837A816AC104EBC67 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */ = {isa = PBXFileReference; path = ViTMatte_Base_1024.mlpackage; sourceTree = "<group>"; };
 		76FCD194792B63F7A3B3F808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */ = {isa = PBXFileReference; path = RealESRGAN_x4.mlpackage; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 		9D66B2C8FC1930AF3D1FA7D4 /* Lightbox */ = {
 			isa = PBXGroup;
 			children = (
+				68F5C46837A816AC104EBC67 /* AppIcon.icon */,
 				76FCD194792B63F7A3B3F808 /* Assets.xcassets */,
 				4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */,
 				1250E5EE4EC41817C64FD2AB /* Engine.swift */,
@@ -153,6 +156,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				71751179D7AE034AE5F807E4 /* AppIcon.icon in Resources */,
 				61232EE7EC3B0ADE67235F03 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

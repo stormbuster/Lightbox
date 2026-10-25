@@ -1,0 +1,85 @@
+{
+  "fill": {
+    "linear-gradient": [
+      "display-p3:1.0,0.70,0.22,1.0",
+      "display-p3:0.95,0.27,0.30,1.0"
+    ],
+    "orientation": {
+      "start": {
+        "x": 0.5,
+        "y": 0
+      },
+      "stop": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
+  "groups": [
+    {
+      "name": "Loupe",
+      "layers": [
+        {
+          "name": "ring",
+          "image-name": "ring.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.15
+      },
+      "specular": true,
+      "lighting": "combined"
+    },
+    {
+      "name": "Photo",
+      "layers": [
+        {
+          "name": "photo",
+          "image-name": "photo.svg",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.2
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      },
+      "specular": false,
+      "lighting": "combined"
+    },
+    {
+      "name": "Slide",
+      "layers": [
+        {
+          "name": "slide",
+          "image-name": "slide.svg",
+          "glass": true
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.45
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.15
+      },
+      "specular": true,
+      "lighting": "combined"
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}
