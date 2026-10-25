@@ -207,7 +207,49 @@ actor Engine {
             let strand = min(abs(a - local[i]) * 12, 1)               // fine hair deviates from its neighbourhood
             out[i] = a * max(faint, strand)
         }
+        removeDetached(&out, width: w, height: h)
         return out
+    }
+
+    /// Drops matte regions that are not attached to the subject: each 8-connected region of visible alpha (> 5 %) is
+    /// kept only if it contains solid subject pixels (> 0.8) and is not a speck. Semi-transparent fragments floating
+    /// beside the subject (a smudge of out-of-focus background, a broken-off wisp) go; strands that run back into the
+    /// hair stay, because they connect to it.
+    nonisolated private func removeDetached(_ alpha: inout [Float], width w: Int, height h: Int) {
+        let n = alpha.count
+        var label = [Int32](repeating: 0, count: n)
+        var sizes: [Int] = [0], solid: [Bool] = [false]
+        var stack: [Int32] = []
+        stack.reserveCapacity(1 << 16)
+        for start in 0..<n where alpha[start] > 0.05 && label[start] == 0 {
+            let id = Int32(sizes.count)
+            var size = 0, hasSolid = false
+            label[start] = id
+            stack.append(Int32(start))
+            while let top = stack.popLast() {
+                let i = Int(top)
+                size += 1
+                if alpha[i] > 0.8 { hasSolid = true }
+                let (x, y) = (i % w, i / w)
+                for dy in -1...1 {
+                    let ny = y + dy
+                    guard ny >= 0, ny < h else { continue }
+                    for dx in -1...1 where dx != 0 || dy != 0 {
+                        let nx = x + dx
+                        guard nx >= 0, nx < w else { continue }
+                        let j = ny * w + nx
+                        if label[j] == 0 && alpha[j] > 0.05 { label[j] = id; stack.append(Int32(j)) }
+                    }
+                }
+            }
+            sizes.append(size)
+            solid.append(hasSolid)
+        }
+        let minSize = max(64, n / 5000)    // 0.02 % of the photo
+        let keep = (0..<sizes.count).map { solid[$0] && sizes[$0] >= minSize }
+        for i in 0..<n where alpha[i] > 0 && (label[i] == 0 || !keep[Int(label[i])]) {
+            alpha[i] = 0
+        }
     }
 
     /// Stage 3, hair: ViTMatte computes exact partial transparency inside an "unknown" band of a trimap built from the

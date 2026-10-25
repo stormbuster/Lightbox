@@ -80,7 +80,8 @@ A 20 MP photo takes about 3 s, in stages (`Lightbox/Engine.swift`):
    Re-running BiRefNet on native-resolution tiles was tried and dropped: a tile that sees only part of a limb loses
    context and smears its edge.
 3. **Clean-up.** Matting leaves a faint, smooth alpha haze beyond soft edges; alpha that is both faint and smooth is
-   faded out, strand-like detail is kept, and specks away from the subject are dropped.
+   faded out, strand-like detail is kept, and any region not connected to the solid subject (a floating wisp or
+   smudge of background) is dropped.
 4. **Colour decontamination.** Edge pixels mix subject and background colour; blur-fusion foreground estimation
    (`Lightbox/ForegroundEstimator.swift`, on Accelerate) recovers the subject's own colour so no outline of the old
    background remains.
