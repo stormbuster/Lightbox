@@ -18,6 +18,7 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
     case nomosDAT2 = "Nomos2_DAT2_x4"
     case bhiDAT2 = "BHI_DAT2_Real_x4"
     case realESRGAN = "RealESRGAN_x4"
+    case vitMatte = "ViTMatte_Base_1024"
 
     static let cutout: [AIModel] = [.birefnetMatting, .birefnetHR]
     static let upscalers: [AIModel] = [.nomosDAT2, .bhiDAT2, .realESRGAN]
@@ -31,6 +32,7 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
         case .nomosDAT2: "Faithful (Nomos2 DAT2)"
         case .bhiDAT2: "Restore (BHI DAT2)"
         case .realESRGAN: "Fast (Real-ESRGAN)"
+        case .vitMatte: "ViTMatte"
         }
     }
 
@@ -41,6 +43,7 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
         case .nomosDAT2: "For clean camera originals (RAW, TIFF, high-quality JPEG). Adds detail without inventing texture."
         case .bhiDAT2: "For compressed, noisy or slightly soft photos: removes JPEG blocks and noise while upscaling."
         case .realESRGAN: "About 4× faster on the Neural Engine. Smoother, slightly painterly look."
+        case .vitMatte: "Trimap matting for hair and fine edges."
         }
     }
 
@@ -140,20 +143,222 @@ actor Engine {
     // MARK: Background removal
 
     /// Full-resolution alpha matte (8-bit linear gray) for the photo.
-    func matte(for rgb: CGImage, using id: AIModel) throws -> CGImage {
+    /// Full-resolution alpha matte (8-bit linear gray) for the photo.
+    ///
+    /// Pass 1 sees the whole photo squeezed to the model's 2048 px, which decides what the subject is. On larger photos,
+    /// fine hair is thinner than a pixel at that scale, so pass 2 re-runs the model on native-resolution tiles along the
+    /// subject's edges and blends that detail in, only inside a band around the pass-1 edge (so a tile's narrower
+    /// context can't add or drop whole objects).
+    func matte(for rgb: CGImage, using id: AIModel, tuning: CutoutTuning = .standard,
+               progress: @Sendable (Double) -> Void = { _ in }) throws -> CGImage {
         let model = try model(id)
-        let size = inputSize(of: model)
+        let tile = Int(inputSize(of: model).width)
+        let (w, h) = (rgb.width, rgb.height)
+        var source = CIImage(cgImage: rgb)
+        if tuning.denoise {   // model input only; the photo's own pixels are untouched
+            source = source.applyingFilter("CINoiseReduction", parameters: ["inputNoiseLevel": 0.03, "inputSharpness": 0.5])
+        }
         let space = workingSpace(rgb)
-        let input = try pixelBuffer(size)
-        context.render(resample(rgb, to: size), to: input, bounds: CGRect(origin: .zero, size: size), colorSpace: space)
+        let extent = CGRect(x: 0, y: 0, width: w, height: h)
 
+        let coarse = try resize(mask: predictMask(model, source: source, rect: extent, space: space), to: extent.size)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["LIGHTBOX_NOREFINE"] == "1" { return coarse }
+        #endif
+        guard max(w, h) > tile * 5 / 4 else { return coarse }
+        progress(0.1)
+
+        var alpha = plane(of: coarse, bounds: extent)
+        // Band: everywhere near a soft or transitional pass-1 value, widened by ~2 % of the photo and feathered.
+        let soft = alpha.map { $0 > 0.02 && $0 < 0.98 ? Float(1) : 0 }
+        let reach = ForegroundEstimator.odd(Double(max(w, h)) * 0.02 * tuning.bandScale)
+        var band = vDSP.multiply(Float(6), ForegroundEstimator.blur(soft, w, h, reach))
+        vDSP.clip(band, to: 0...1, result: &band)
+
+        var detail = [Float](repeating: 0, count: w * h), weight = [Float](repeating: 0, count: w * h)
+        let overlap = tile / 8
+        let xs = starts(length: w, tile: tile, overlap: overlap), ys = starts(length: h, tile: tile, overlap: overlap)
+        var done = 0
+        for ty in ys {
+            for tx in xs {
+                try Task.checkCancellation()
+                done += 1
+                let rect = CGRect(x: tx, y: ty, width: min(tile, w), height: min(tile, h))
+                let (rw, rh) = (Int(rect.width), Int(rect.height))
+                let top = h - ty - rh                                   // bitmap row of the rect's top edge
+                var touchesBand = false
+                for r in stride(from: 0, to: rh, by: 8) where !touchesBand {
+                    let row = (top + r) * w + tx
+                    for c in stride(from: 0, to: rw, by: 8) where band[row + c] > 0 { touchesBand = true; break }
+                }
+                guard touchesBand else { continue }
+
+                let local = try predictMask(model, source: source, rect: rect, space: space)
+                let placed = resample(local, to: rect.size).transformed(by: CGAffineTransform(translationX: rect.minX, y: rect.minY))
+                let values = plane(of: placed, bounds: rect)
+                // Feather tile seams; image borders keep full weight.
+                for r in 0..<rh {
+                    let wy = feather(r, rh, overlap, atStart: ty + rh == h ? false : true, atEnd: ty == 0 ? false : true)
+                    for c in 0..<rw {
+                        let wx = feather(c, rw, overlap, atStart: tx > 0, atEnd: tx + rw < w)
+                        let i = (top + r) * w + tx + c
+                        let wt = wx * wy
+                        detail[i] += values[r * rw + c] * wt
+                        weight[i] += wt
+                    }
+                }
+                progress(0.1 + 0.5 * Double(done) / Double(xs.count * ys.count))
+            }
+        }
+        for i in 0..<alpha.count where weight[i] > 0 && band[i] > 0 {
+            alpha[i] += band[i] * (detail[i] / weight[i] - alpha[i])
+        }
+        var hair = id == .birefnetMatting && min(w, h) >= 1024
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["LIGHTBOX_NOHAIR"] == "1" { hair = false }
+        #endif
+        if hair {
+            alpha = try hairMatte(alpha, source: source, space: space, width: w, height: h, tuning: tuning, progress: progress)
+        }
+        return try grayImage(alpha, width: w, height: h)
+    }
+
+    /// Stage 3, hair: ViTMatte computes exact partial transparency inside an "unknown" band of a trimap built from the
+    /// segmentation (definite subject / definite background / unknown). The band reaches further outwards than inwards,
+    /// because flyaway hair sits outside the segmentation edge. Runs on native-resolution 1024 px tiles.
+    private func hairMatte(_ alpha: [Float], source: CIImage, space: CGColorSpace, width w: Int, height h: Int,
+                           tuning: CutoutTuning, progress: @Sendable (Double) -> Void) throws -> [Float] {
+        let model = try model(.vitMatte)
+        let tile = Int(inputSize(of: model).width)
+        let longest = Double(max(w, h))
+        let outward = ForegroundEstimator.odd(longest * 0.012 * tuning.bandScale)
+        let inward = ForegroundEstimator.odd(longest * 0.004 * tuning.bandScale)
+
+        let solid = alpha.map { $0 > 0.5 ? Float(1) : 0 }
+        let grown = ForegroundEstimator.blur(solid, w, h, outward)       // > 0  → within reach outside the subject
+        let shrunk = ForegroundEstimator.blur(solid, w, h, inward)       // ≈ 1 → safely inside the subject
+        var trimap = [Float](repeating: 0, count: alpha.count)
+        for i in 0..<alpha.count {
+            let unknown = (grown[i] > 0.002 && shrunk[i] < 0.998) || (alpha[i] > 0.03 && alpha[i] < 0.97)
+            trimap[i] = unknown ? 0.5 : (alpha[i] > 0.5 ? 1 : 0)
+        }
+
+        var result = alpha, acc = [Float](repeating: 0, count: alpha.count), weight = [Float](repeating: 0, count: alpha.count)
+        let overlap = tile / 8
+        let xs = starts(length: w, tile: tile, overlap: overlap), ys = starts(length: h, tile: tile, overlap: overlap)
+        let image = try pixelBuffer(CGSize(width: tile, height: tile))
+        let tri = try grayBuffer(tile)
+        var done = 0
+        for ty in ys {
+            for tx in xs {
+                try Task.checkCancellation()
+                done += 1
+                let top = h - ty - tile
+                var any = false
+                for r in stride(from: 0, to: tile, by: 4) where !any {
+                    let row = (top + r) * w + tx
+                    for c in stride(from: 0, to: tile, by: 4) where trimap[row + c] == 0.5 { any = true; break }
+                }
+                guard any else { continue }
+
+                let window = source.transformed(by: CGAffineTransform(translationX: CGFloat(-tx), y: CGFloat(-ty)))
+                context.render(window, to: image, bounds: CGRect(x: 0, y: 0, width: tile, height: tile), colorSpace: space)
+                fill(tri, from: trimap, imageWidth: w, x: tx, top: top, size: tile)
+                let out = try model.prediction(from: MLDictionaryFeatureProvider(dictionary: [
+                    "image": MLFeatureValue(pixelBuffer: image), "trimap": MLFeatureValue(pixelBuffer: tri)]))
+                guard let matte = out.featureValue(for: "alpha")?.imageBufferValue else { throw EngineError.noOutput }
+                let values = plane(of: CIImage(cvPixelBuffer: matte, options: [.colorSpace: linearGray]),
+                                   bounds: CGRect(x: 0, y: 0, width: tile, height: tile))
+                for r in 0..<tile {
+                    let wy = feather(r, tile, overlap, atStart: ty + tile < h, atEnd: ty > 0)
+                    for c in 0..<tile {
+                        let i = (top + r) * w + tx + c
+                        guard trimap[i] == 0.5 else { continue }
+                        let wt = wy * feather(c, tile, overlap, atStart: tx > 0, atEnd: tx + tile < w)
+                        acc[i] += values[r * tile + c] * wt
+                        weight[i] += wt
+                    }
+                }
+                progress(0.6 + 0.4 * Double(done) / Double(xs.count * ys.count))
+            }
+        }
+        for i in 0..<result.count where weight[i] > 0 { result[i] = acc[i] / weight[i] }
+        return result
+    }
+
+    private func grayBuffer(_ size: Int) throws -> CVPixelBuffer {
+        var buffer: CVPixelBuffer?
+        let attrs = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
+        guard CVPixelBufferCreate(nil, size, size, kCVPixelFormatType_OneComponent8, attrs, &buffer) == kCVReturnSuccess,
+              let buffer else { throw EngineError.render }
+        return buffer
+    }
+
+    /// Copies a size × size window of a Float plane (0…1, row 0 = top) into an 8-bit gray pixel buffer.
+    private func fill(_ buffer: CVPixelBuffer, from plane: [Float], imageWidth: Int, x: Int, top: Int, size: Int) {
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
+        let stride = CVPixelBufferGetBytesPerRow(buffer)
+        for r in 0..<size {
+            let src = (top + r) * imageWidth + x
+            for c in 0..<size { base[r * stride + c] = UInt8((plane[src + c] * 255).rounded()) }
+        }
+    }
+
+    /// One model pass over `rect` of the photo (resampled to the model's input), as an 8-bit matte at model size.
+    private func predictMask(_ model: MLModel, source: CIImage, rect: CGRect, space: CGColorSpace) throws -> CGImage {
+        let size = inputSize(of: model)
+        let crop = source.cropped(to: rect).transformed(by: CGAffineTransform(translationX: -rect.minX, y: -rect.minY))
+        let scaled = crop.applyingFilter("CILanczosScaleTransform", parameters: [
+            kCIInputScaleKey: size.height / rect.height,
+            kCIInputAspectRatioKey: (size.width / rect.width) / (size.height / rect.height),
+        ])
+        let input = try pixelBuffer(size)
+        context.render(scaled, to: input, bounds: CGRect(origin: .zero, size: size), colorSpace: space)
         let output = try model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: input)]))
-        guard let buffer = output.featureValue(for: "mask")?.imageBufferValue else { throw EngineError.noOutput }
-        let small = context.createCGImage(CIImage(cvPixelBuffer: buffer, options: [.colorSpace: linearGray]),
-                                          from: CGRect(origin: .zero, size: size), format: .L8, colorSpace: linearGray)
-        guard let small else { throw EngineError.render }
-        let full = CGSize(width: rgb.width, height: rgb.height)
-        return try resize(mask: small, to: full)
+        guard let buffer = output.featureValue(for: "mask")?.imageBufferValue,
+              let mask = context.createCGImage(CIImage(cvPixelBuffer: buffer, options: [.colorSpace: linearGray]),
+                                               from: CGRect(origin: .zero, size: size), format: .L8, colorSpace: linearGray)
+        else { throw EngineError.noOutput }
+        return mask
+    }
+
+    /// Tile origins covering `length` with at least `overlap` px shared between neighbours.
+    nonisolated private func starts(length: Int, tile: Int, overlap: Int) -> [Int] {
+        guard length > tile else { return [0] }
+        let count = Int((Double(length - overlap) / Double(tile - overlap)).rounded(.up))
+        return (0..<count).map { Int((Double(length - tile) * Double($0) / Double(count - 1)).rounded()) }
+    }
+
+    /// Linear ramp over `overlap` px at tile edges that border another tile.
+    nonisolated private func feather(_ i: Int, _ n: Int, _ overlap: Int, atStart: Bool, atEnd: Bool) -> Float {
+        var v: Float = 1
+        if atStart { v = min(v, Float(i + 1) / Float(overlap)) }
+        if atEnd { v = min(v, Float(n - i) / Float(overlap)) }
+        return max(v, 1e-3)
+    }
+
+    /// Gray image as a Float plane (row 0 = top of `bounds`).
+    nonisolated private func plane(of image: CGImage, bounds: CGRect) -> [Float] {
+        plane(of: CIImage(cgImage: image), bounds: bounds)
+    }
+
+    nonisolated private func plane(of image: CIImage, bounds: CGRect) -> [Float] {
+        var values = [Float](repeating: 0, count: Int(bounds.width) * Int(bounds.height))
+        values.withUnsafeMutableBytes {
+            context.render(image, toBitmap: $0.baseAddress!, rowBytes: Int(bounds.width) * 4, bounds: bounds, format: .Lf, colorSpace: linearGray)
+        }
+        return values
+    }
+
+    nonisolated private func grayImage(_ values: [Float], width: Int, height: Int) throws -> CGImage {
+        var clipped = values
+        vDSP.clip(clipped, to: 0...1, result: &clipped)
+        let data = clipped.withUnsafeBytes { Data($0) }
+        let image = CIImage(bitmapData: data, bytesPerRow: width * 4, size: CGSize(width: width, height: height), format: .Lf, colorSpace: linearGray)
+        guard let out = context.createCGImage(image, from: image.extent, format: .L8, colorSpace: linearGray) else { throw EngineError.render }
+        return out
     }
 
     nonisolated func resize(mask: CGImage, to size: CGSize) throws -> CGImage {

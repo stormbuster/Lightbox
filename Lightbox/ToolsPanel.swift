@@ -23,6 +23,20 @@ struct ToolsPanel: View {
                     Text(editor.cutoutModel.detail)
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                    if let shooting = editor.shooting {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(shooting.summary, systemImage: "camera")
+                                .font(.caption.weight(.medium))
+                            if !editor.tuning.reasons.isEmpty {
+                                Text("Tuned for " + editor.tuning.reasons.joined(separator: "; ") + ".")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+                    }
                     Button {
                         editor.removeBackground()
                     } label: {
@@ -86,14 +100,22 @@ struct ToolsPanel: View {
                 Button("Revert") { editor.revert() }
                     .disabled(!editor.isModified)
                 Spacer()
-                Text("Hold to compare")
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(editor.showOriginal ? Color.accentColor.opacity(0.3) : Color.secondary.opacity(0.15),
-                                in: Capsule())
-                    .onLongPressGesture(minimumDuration: .infinity, pressing: { editor.showOriginal = $0 }, perform: {})
-                    .disabled(!editor.isModified)
             }
+
+            HStack {
+                Text("Compare").font(.callout).foregroundStyle(.secondary)
+                Spacer()
+                Toggle(isOn: $editor.showOriginal) {
+                    Label("Original", systemImage: "eye")
+                }
+                .help("Show the original photo (\\)")
+                Toggle(isOn: $editor.splitCompare) {
+                    Label("Split", systemImage: "rectangle.split.2x1")
+                }
+                .help("Before/after line you can drag across the photo (⌘\\)")
+            }
+            .toggleStyle(.button)
+            .disabled(!editor.isModified)
 
             Divider()
 

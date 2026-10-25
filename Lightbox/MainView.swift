@@ -14,6 +14,8 @@ struct MainView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var isTargeted = false
 
+    private var isSplit: Bool { editor.splitCompare && !editor.showOriginal && editor.isModified }
+
     var body: some View {
         ZStack {
             Color.black
@@ -24,6 +26,17 @@ struct MainView: View {
                     Image(decorative: preview, scale: 1)
                         .resizable()
                         .interpolation(.high)
+                    if isSplit, let original = editor.original?.preview {
+                        // Before on the left of the split line, after on the right.
+                        Image(decorative: original, scale: 1)
+                            .resizable()
+                            .interpolation(.high)
+                            .mask {
+                                GeometryReader { geo in
+                                    Rectangle().frame(width: geo.size.width * editor.splitPosition)
+                                }
+                            }
+                    }
                 }
                 .aspectRatio(CGFloat(preview.width) / CGFloat(preview.height), contentMode: .fit)
             } else {
@@ -54,6 +67,13 @@ struct MainView: View {
         .overlay(DropDragView.Representable(isTargeted: $isTargeted) { urls in
             editor.load(urls.first!)
         })
+        .overlay {
+            // Above the window-drag layer so the handle receives the drag.
+            if isSplit, let preview = editor.displayedPreview {
+                SplitHandle(position: Bindable(editor).splitPosition,
+                            aspect: CGFloat(preview.width) / CGFloat(preview.height))
+            }
+        }
         .onChange(of: editor.documentID) {
             guard let layer = editor.layer else { return }
             fit(window, to: CGSize(width: layer.rgb.width, height: layer.rgb.height))
@@ -98,6 +118,33 @@ final class DropDragView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         window?.performDrag(with: event)
+    }
+
+    // The traffic-light buttons stay out of the way and fade in while the cursor is over the window.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        if let window { Self.setWindowButtons(of: window, visible: true, animated: true) }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        if let window { Self.setWindowButtons(of: window, visible: false, animated: true) }
+    }
+
+    static func setWindowButtons(of window: NSWindow, visible: Bool, animated: Bool) {
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap(window.standardWindowButton)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = animated ? 0.18 : 0
+            for button in buttons {
+                button.isHidden = false
+                button.animator().alphaValue = visible ? 1 : 0
+            }
+        }
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -154,6 +201,61 @@ final class DropDragView: NSView {
         func updateNSView(_ nsView: DropDragView, context: Context) {
             nsView.onDrop = onDrop
         }
+    }
+}
+
+
+/// The draggable before/after line, drawn over the photo's fitted frame.
+struct SplitHandle: View {
+    @Binding var position: CGFloat
+    let aspect: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let frame = fitted(in: geo.size)
+            let x = frame.minX + frame.width * position
+            ZStack {
+                Rectangle()
+                    .fill(.white)
+                    .frame(width: 2, height: frame.height)
+                    .shadow(color: .black.opacity(0.5), radius: 2)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 30, height: 30)
+                    .shadow(color: .black.opacity(0.4), radius: 3)
+                    .overlay(Image(systemName: "arrow.left.and.right").font(.system(size: 12, weight: .bold)).foregroundStyle(.black))
+            }
+            .frame(width: 44, height: frame.height)
+            .contentShape(Rectangle())
+            .position(x: x, y: frame.midY)
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("split")).onChanged { value in
+                position = min(1, max(0, (value.location.x - frame.minX) / frame.width))
+            })
+            .onHover { inside in
+                if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+            }
+
+            Text("Before").splitLabel().position(x: frame.minX + 40, y: frame.minY + 22)
+            Text("After").splitLabel().position(x: frame.maxX - 36, y: frame.minY + 22)
+        }
+        .coordinateSpace(name: "split")
+    }
+
+    private func fitted(in size: CGSize) -> CGRect {
+        let scale = min(size.width / aspect, size.height)
+        let (w, h) = (scale * aspect, scale)
+        return CGRect(x: (size.width - w) / 2, y: (size.height - h) / 2, width: w, height: h)
+    }
+}
+
+
+private extension Text {
+    func splitLabel() -> some View {
+        font(.caption.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(.black.opacity(0.45), in: Capsule())
+            .allowsHitTesting(false)
     }
 }
 

@@ -12,11 +12,26 @@ import AppKit
 
 enum SelfTest {
     /// `--snapshot <dir>`: 10 s after launch, writes each window's contents as PNG into <dir> (container path).
+    /// Set by the app once its editor exists, for `--demo-cutout`.
+    static weak var editor: Editor?
+
     static func scheduleSnapshot() {
         let args = CommandLine.arguments
         guard let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count else { return }
         let dir = URL(fileURLWithPath: args[i + 1])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+        Task { @MainActor in
+            // `--demo-cutout`: once a photo is open, remove its background and show the before/after split.
+            if args.contains("--demo-cutout") {
+                while editor?.layer == nil || editor?.isBusy == true { try? await Task.sleep(for: .milliseconds(200)) }
+                editor?.removeBackground()
+                try? await Task.sleep(for: .milliseconds(300))
+                while editor?.isBusy == true { try? await Task.sleep(for: .milliseconds(200)) }
+                editor?.splitPosition = 0.45
+                editor?.splitCompare = true
+                try? await Task.sleep(for: .seconds(1))
+            } else {
+                try? await Task.sleep(for: .seconds(10))
+            }
             for (n, window) in NSApp.windows.enumerated() where window.isVisible {
                 guard let view = window.contentView?.superview ?? window.contentView,
                       let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }

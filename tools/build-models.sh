@@ -21,5 +21,6 @@ M=../Lightbox/Models
 [[ -d $M/BiRefNet_HR_Matting_2048.mlpackage ]] || .venv/bin/python convert_birefnet.py cache/hf/BiRefNet_HR-matting $M/BiRefNet_HR_Matting_2048.mlpackage 2048
 [[ -d $M/Nomos2_DAT2_x4.mlpackage ]] || .venv/bin/python convert_upscaler.py cache/up/4xNomos2_hq_dat2.pth $M/Nomos2_DAT2_x4.mlpackage 256
 [[ -d $M/BHI_DAT2_Real_x4.mlpackage ]] || .venv/bin/python convert_upscaler.py cache/up/4xBHI_dat2_real.safetensors $M/BHI_DAT2_Real_x4.mlpackage 256
+[[ -d $M/ViTMatte_Base_1024.mlpackage ]] || { HF_HOME=$PWD/cache/hf .venv/bin/hf download hustvl/vitmatte-base-composition-1k --local-dir cache/hf/vitmatte-base && .venv/bin/python convert_vitmatte.py cache/hf/vitmatte-base $M/ViTMatte_Base_1024.mlpackage 1024; }
 [[ -d $M/RealESRGAN_x4.mlpackage ]] || .venv/bin/python convert_upscaler.py cache/up/RealESRGAN_x4plus.pth $M/RealESRGAN_x4.mlpackage 256
 ls -d $M/*.mlpackage

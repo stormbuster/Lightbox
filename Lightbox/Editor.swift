@@ -22,6 +22,10 @@ final class Editor {
     private(set) var progress: Double?
     var errorMessage: String?
     var showOriginal = false
+    var splitCompare = false
+    var splitPosition: CGFloat = 0.5
+    private(set) var shooting: ShootingInfo?
+    private(set) var tuning = CutoutTuning.standard
 
     var cutoutModel: AIModel = .birefnetMatting
     var upscaleModel: AIModel = .bhiDAT2
@@ -44,6 +48,11 @@ final class Editor {
             return { editor in
                 editor.sourceURL = url
                 editor.metadata = metadata
+                editor.shooting = ShootingInfo(metadata)
+                editor.tuning = editor.shooting?.tuning ?? .standard
+                editor.cutoutModel = editor.tuning.model
+                editor.showOriginal = false
+                editor.splitCompare = false
                 editor.original = layer
                 editor.history = []
                 editor.exportFormat = mask == nil ? editor.formatMatching(url) : .png
@@ -65,9 +74,11 @@ final class Editor {
 
     func removeBackground() {
         guard let current = layer else { return }
-        let model = cutoutModel
-        perform("Removing background…") {
-            let mask = try await Engine.shared.matte(for: current.rgb, using: model)
+        let (model, tuning) = (cutoutModel, tuning)
+        perform("Removing background…") { [weak self] in
+            let mask = try await Engine.shared.matte(for: current.rgb, using: model, tuning: tuning) { fraction in
+                Task { @MainActor in self?.progress = fraction }
+            }
             let layer = try Engine.shared.makeLayer(rgb: current.rgb, mask: mask)
             return { editor in
                 if editor.exportFormat == .jpeg { editor.exportFormat = .png }
@@ -98,6 +109,8 @@ final class Editor {
 
     func revert() {
         guard let original, layer != nil else { return }
+        showOriginal = false
+        splitCompare = false
         if let current = layer { history.append(current) }
         layer = original
     }

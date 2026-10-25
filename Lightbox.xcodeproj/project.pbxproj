@@ -10,6 +10,7 @@
 		0B2F5E37ACA07E3B52AE9EC5 /* ToolsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28AD9677F343321B9A56669 /* ToolsPanel.swift */; };
 		12C349D1CBA3A7FB44DE1BE8 /* RealESRGAN_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */; };
 		57CAA69D9E73B4075D94ACC8 /* PhotoIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E442D36436F2B39D56C1EB21 /* PhotoIO.swift */; };
+		58BA1E366F3011E9DFA984CE /* ViTMatte_Base_1024.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */; };
 		608283A26A218A730254A524 /* LightboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */; };
 		61232EE7EC3B0ADE67235F03 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 76FCD194792B63F7A3B3F808 /* Assets.xcassets */; };
 		863730A57A6775C85F9504FA /* BHI_DAT2_Real_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = EE0D651DB5F79381718A228B /* BHI_DAT2_Real_x4.mlpackage */; };
@@ -20,6 +21,7 @@
 		BA7E2667A33D6003932BB71F /* BiRefNet_HR_Matting_2048.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 08BE21612DD857B660A9AB51 /* BiRefNet_HR_Matting_2048.mlpackage */; };
 		D4A85AF8B940475AF5537D43 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BCF37F596B36103F8E541D /* SelfTest.swift */; };
 		D7D6C0D9F9F4BA2B14CD0C60 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1250E5EE4EC41817C64FD2AB /* Engine.swift */; };
+		F747487C6BFED2FDA707F0DA /* ShootingInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */; };
 		F988EF0E605103B57ACD25A1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */; };
 /* End PBXBuildFile section */
 
@@ -31,6 +33,7 @@
 		4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
 		5B2633E77D58BDC72A943B51 /* Lightbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lightbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForegroundEstimator.swift; sourceTree = "<group>"; };
+		69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */ = {isa = PBXFileReference; path = ViTMatte_Base_1024.mlpackage; sourceTree = "<group>"; };
 		76FCD194792B63F7A3B3F808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */ = {isa = PBXFileReference; path = RealESRGAN_x4.mlpackage; sourceTree = "<group>"; };
 		8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightboxApp.swift; sourceTree = "<group>"; };
@@ -38,6 +41,7 @@
 		AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		CC6FACA52E482AE00CF9DFF2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D4BCF37F596B36103F8E541D /* SelfTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfTest.swift; sourceTree = "<group>"; };
+		DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShootingInfo.swift; sourceTree = "<group>"; };
 		E442D36436F2B39D56C1EB21 /* PhotoIO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoIO.swift; sourceTree = "<group>"; };
 		EE0D651DB5F79381718A228B /* BHI_DAT2_Real_x4.mlpackage */ = {isa = PBXFileReference; path = BHI_DAT2_Real_x4.mlpackage; sourceTree = "<group>"; };
 		F58CE2EDD0CE973D0B8DD3B0 /* Nomos2_DAT2_x4.mlpackage */ = {isa = PBXFileReference; path = Nomos2_DAT2_x4.mlpackage; sourceTree = "<group>"; };
@@ -52,6 +56,7 @@
 				08BE21612DD857B660A9AB51 /* BiRefNet_HR_Matting_2048.mlpackage */,
 				F58CE2EDD0CE973D0B8DD3B0 /* Nomos2_DAT2_x4.mlpackage */,
 				7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */,
+				69CF391847B242F918597161 /* ViTMatte_Base_1024.mlpackage */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -77,6 +82,7 @@
 				AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */,
 				E442D36436F2B39D56C1EB21 /* PhotoIO.swift */,
 				D4BCF37F596B36103F8E541D /* SelfTest.swift */,
+				DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */,
 				A28AD9677F343321B9A56669 /* ToolsPanel.swift */,
 				34994535DBA27C677C9E9908 /* Models */,
 			);
@@ -170,7 +176,9 @@
 				57CAA69D9E73B4075D94ACC8 /* PhotoIO.swift in Sources */,
 				12C349D1CBA3A7FB44DE1BE8 /* RealESRGAN_x4.mlpackage in Sources */,
 				D4A85AF8B940475AF5537D43 /* SelfTest.swift in Sources */,
+				F747487C6BFED2FDA707F0DA /* ShootingInfo.swift in Sources */,
 				0B2F5E37ACA07E3B52AE9EC5 /* ToolsPanel.swift in Sources */,
+				58BA1E366F3011E9DFA984CE /* ViTMatte_Base_1024.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

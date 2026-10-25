@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func attach(_ editor: Editor) {
         self.editor = editor
+        #if DEBUG
+        SelfTest.editor = editor
+        #endif
         if let pending { editor.load(pending); self.pending = nil }
     }
 }
@@ -64,9 +67,7 @@ struct LightboxApp: App {
                     newWindow.titlebarAppearsTransparent = true
                     newWindow.backgroundColor = .black
                     newWindow.contentAspectRatio = CGSize(width: 16, height: 9)
-                    for button: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
-                        newWindow.standardWindowButton(button)?.isHidden = true
-                    }
+                    DropDragView.setWindowButtons(of: newWindow, visible: false, animated: false)
                 }
                 .task { await Engine.shared.warmUp() }
                 .onAppear { appDelegate.attach(editor) }
@@ -80,6 +81,14 @@ struct LightboxApp: App {
             CommandGroup(replacing: .saveItem) {
                 Button("Save As…") { editor.saveWithPanel() }.keyboardShortcut("s")
                     .disabled(editor.layer == nil || editor.isBusy)
+            }
+            CommandMenu("Compare") {
+                Button(editor.showOriginal ? "Show Edited" : "Show Original") { editor.showOriginal.toggle() }
+                    .keyboardShortcut("\\", modifiers: [])
+                    .disabled(!editor.isModified)
+                Button(editor.splitCompare ? "Hide Before/After Split" : "Before/After Split") { editor.splitCompare.toggle() }
+                    .keyboardShortcut("\\", modifiers: .command)
+                    .disabled(!editor.isModified)
             }
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") { editor.undo() }.keyboardShortcut("z")

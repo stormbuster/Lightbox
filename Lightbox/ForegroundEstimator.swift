@@ -46,7 +46,7 @@ nonisolated enum ForegroundEstimator {
     }
 
     /// Separable box blur, applied twice (≈ tent filter, avoids box artefacts at large radii). Edges are extended.
-    private static func blur(_ plane: [Float], _ width: Int, _ height: Int, _ kernel: Int) -> [Float] {
+    static func blur(_ plane: [Float], _ width: Int, _ height: Int, _ kernel: Int) -> [Float] {
         var a = plane
         var b = [Float](repeating: 0, count: plane.count)
         let r = kernel / 2
@@ -78,7 +78,7 @@ nonisolated enum ForegroundEstimator {
         }
     }
 
-    private static func odd(_ value: Double) -> Int {
+    static func odd(_ value: Double) -> Int {
         let v = Int(value.rounded())
         return v.isMultiple(of: 2) ? v + 1 : v
     }
