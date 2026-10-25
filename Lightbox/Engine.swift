@@ -9,6 +9,7 @@
 import CoreML
 import CoreImage
 import CoreVideo
+import Accelerate
 
 
 nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
@@ -18,15 +19,15 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
     case bhiDAT2 = "BHI_DAT2_Real_x4"
     case realESRGAN = "RealESRGAN_x4"
 
-    static let cutout: [AIModel] = [.birefnetHR, .birefnetMatting]
+    static let cutout: [AIModel] = [.birefnetMatting, .birefnetHR]
     static let upscalers: [AIModel] = [.nomosDAT2, .bhiDAT2, .realESRGAN]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .birefnetHR: "BiRefNet HR"
-        case .birefnetMatting: "BiRefNet HR Matting"
+        case .birefnetHR: "Crisp edges (BiRefNet HR)"
+        case .birefnetMatting: "Soft edges (BiRefNet Matting)"
         case .nomosDAT2: "Faithful (Nomos2 DAT2)"
         case .bhiDAT2: "Restore (BHI DAT2)"
         case .realESRGAN: "Fast (Real-ESRGAN)"
@@ -35,8 +36,8 @@ nonisolated enum AIModel: String, CaseIterable, Identifiable, Sendable {
 
     var detail: String {
         switch self {
-        case .birefnetHR: "Crisp subject cutouts at 2048 px. Best for products, people, objects."
-        case .birefnetMatting: "Soft alpha matte for hair, fur, veils and glass."
+        case .birefnetHR: "Hard, clean outlines for products and objects with sharp edges."
+        case .birefnetMatting: "Partial transparency for hair, fur, motion and focus blur. Best for people and animals."
         case .nomosDAT2: "For clean camera originals (RAW, TIFF, high-quality JPEG). Adds detail without inventing texture."
         case .bhiDAT2: "For compressed, noisy or slightly soft photos: removes JPEG blocks and noise while upscaling."
         case .realESRGAN: "About 4× faster on the Neural Engine. Smoother, slightly painterly look."
@@ -91,7 +92,7 @@ actor Engine {
 
     /// Load the default models and run one blank prediction each, so the first click doesn't pay the GPU compile.
     func warmUp() {
-        for id in [AIModel.birefnetHR, .bhiDAT2] {
+        for id in [AIModel.birefnetMatting, .bhiDAT2] {
             guard let model = try? model(id), let input = try? pixelBuffer(inputSize(of: model)) else { continue }
             _ = try? model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: input)]))
         }
@@ -151,7 +152,8 @@ actor Engine {
         let small = context.createCGImage(CIImage(cvPixelBuffer: buffer, options: [.colorSpace: linearGray]),
                                           from: CGRect(origin: .zero, size: size), format: .L8, colorSpace: linearGray)
         guard let small else { throw EngineError.render }
-        return try resize(mask: small, to: CGSize(width: rgb.width, height: rgb.height))
+        let full = CGSize(width: rgb.width, height: rgb.height)
+        return try resize(mask: small, to: full)
     }
 
     nonisolated func resize(mask: CGImage, to size: CGSize) throws -> CGImage {
@@ -215,10 +217,7 @@ actor Engine {
     nonisolated func composite(_ rgb: CGImage, mask: CGImage?, flattenOnto background: CGColor? = nil) throws -> CGImage {
         guard let mask else { return rgb }
         let space = workingSpace(rgb)
-        var image = CIImage(cgImage: rgb).applyingFilter("CIBlendWithRedMask", parameters: [
-            kCIInputBackgroundImageKey: CIImage.empty(),
-            kCIInputMaskImageKey: CIImage(cgImage: mask),
-        ])
+        var image = try decontaminated(rgb, mask: mask, space: space)
         if let background {
             image = image.composited(over: CIImage(color: CIColor(cgColor: background)).cropped(to: image.extent))
         }
@@ -226,6 +225,45 @@ actor Engine {
         guard let out = context.createCGImage(image, from: CGRect(x: 0, y: 0, width: rgb.width, height: rgb.height),
                                               format: format, colorSpace: space) else { throw EngineError.render }
         return out
+    }
+
+    /// Premultiplied cutout whose edge colours have the background's colour removed (see ForegroundEstimator).
+    nonisolated private func decontaminated(_ rgb: CGImage, mask: CGImage, space: CGColorSpace) throws -> CIImage {
+        let (w, h) = (rgb.width, rgb.height)
+        let n = w * h
+        let extent = CGRect(x: 0, y: 0, width: w, height: h)
+        var rgba = [Float](repeating: 0, count: n * 4)
+        var alpha = [Float](repeating: 0, count: n)
+        rgba.withUnsafeMutableBytes { context.render(CIImage(cgImage: rgb), toBitmap: $0.baseAddress!, rowBytes: w * 16, bounds: extent, format: .RGBAf, colorSpace: space) }
+        alpha.withUnsafeMutableBytes { context.render(CIImage(cgImage: mask), toBitmap: $0.baseAddress!, rowBytes: w * 4, bounds: extent, format: .Lf, colorSpace: linearGray) }
+
+        var planar = [Float](repeating: 0, count: n * 4)
+        try convert(&rgba, &planar, width: w, height: h, toPlanar: true)
+        let rgb3 = (0..<3).map { Array(planar[$0 * n..<($0 + 1) * n]) }
+        let foreground = ForegroundEstimator.estimate(rgb: rgb3, alpha: alpha, width: w, height: h)
+
+        // Re-interleave as premultiplied RGBA (Core Image's convention for float bitmaps).
+        planar = (0..<3).flatMap { vDSP.multiply(foreground[$0], alpha) } + alpha
+        try convert(&rgba, &planar, width: w, height: h, toPlanar: false)
+        let data = rgba.withUnsafeBytes { Data($0) }
+        return CIImage(bitmapData: data, bytesPerRow: w * 16, size: extent.size, format: .RGBAf, colorSpace: space)
+    }
+
+    /// RGBA float pixels ⇄ four consecutive planes (vImage's "ARGB" naming is positional, so RGBA order works too).
+    nonisolated private func convert(_ rgba: inout [Float], _ planar: inout [Float], width: Int, height: Int, toPlanar: Bool) throws {
+        let n = width * height
+        let status = rgba.withUnsafeMutableBytes { chunky in
+            planar.withUnsafeMutableBufferPointer { planes in
+                var interleaved = vImage_Buffer(data: chunky.baseAddress, height: vImagePixelCount(height), width: vImagePixelCount(width), rowBytes: width * 16)
+                var p = (0..<4).map {
+                    vImage_Buffer(data: planes.baseAddress! + $0 * n, height: vImagePixelCount(height), width: vImagePixelCount(width), rowBytes: width * 4)
+                }
+                return toPlanar
+                    ? vImageConvert_ARGBFFFFtoPlanarF(&interleaved, &p[0], &p[1], &p[2], &p[3], vImage_Flags(kvImageNoFlags))
+                    : vImageConvert_PlanarFtoARGBFFFF(&p[0], &p[1], &p[2], &p[3], &interleaved, vImage_Flags(kvImageNoFlags))
+            }
+        }
+        guard status == kvImageNoError else { throw EngineError.render }
     }
 
     /// Splits an image that already has transparency into opaque colour + matte.

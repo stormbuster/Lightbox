@@ -23,7 +23,7 @@ final class Editor {
     var errorMessage: String?
     var showOriginal = false
 
-    var cutoutModel: AIModel = .birefnetHR
+    var cutoutModel: AIModel = .birefnetMatting
     var upscaleModel: AIModel = .bhiDAT2
     var upscaleFactor = 2
     var exportFormat: ExportFormat = .png

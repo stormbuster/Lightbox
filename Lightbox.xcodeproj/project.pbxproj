@@ -13,6 +13,7 @@
 		608283A26A218A730254A524 /* LightboxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */; };
 		61232EE7EC3B0ADE67235F03 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 76FCD194792B63F7A3B3F808 /* Assets.xcassets */; };
 		863730A57A6775C85F9504FA /* BHI_DAT2_Real_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = EE0D651DB5F79381718A228B /* BHI_DAT2_Real_x4.mlpackage */; };
+		88327B4A673C6F92405AEEC1 /* ForegroundEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */; };
 		A37AAF2111F3F21B9949B047 /* BiRefNet_HR_2048.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 336171D542D9D56A9F0ABD95 /* BiRefNet_HR_2048.mlpackage */; };
 		A753915C0953F3451E80C1F4 /* Nomos2_DAT2_x4.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = F58CE2EDD0CE973D0B8DD3B0 /* Nomos2_DAT2_x4.mlpackage */; };
 		A8CBC1C6DF4656563DAE02D8 /* Editor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */; };
@@ -29,6 +30,7 @@
 		3D8A2E4268B3A8916ED623DA /* Lightbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Lightbox.entitlements; sourceTree = "<group>"; };
 		4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
 		5B2633E77D58BDC72A943B51 /* Lightbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lightbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForegroundEstimator.swift; sourceTree = "<group>"; };
 		76FCD194792B63F7A3B3F808 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7B78F49D9A736834B283CF9C /* RealESRGAN_x4.mlpackage */ = {isa = PBXFileReference; path = RealESRGAN_x4.mlpackage; sourceTree = "<group>"; };
 		8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LightboxApp.swift; sourceTree = "<group>"; };
@@ -68,6 +70,7 @@
 				76FCD194792B63F7A3B3F808 /* Assets.xcassets */,
 				4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */,
 				1250E5EE4EC41817C64FD2AB /* Engine.swift */,
+				5F4F9B9B2C6E89897193E249 /* ForegroundEstimator.swift */,
 				CC6FACA52E482AE00CF9DFF2 /* Info.plist */,
 				3D8A2E4268B3A8916ED623DA /* Lightbox.entitlements */,
 				8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */,
@@ -160,6 +163,7 @@
 				BA7E2667A33D6003932BB71F /* BiRefNet_HR_Matting_2048.mlpackage in Sources */,
 				A8CBC1C6DF4656563DAE02D8 /* Editor.swift in Sources */,
 				D7D6C0D9F9F4BA2B14CD0C60 /* Engine.swift in Sources */,
+				88327B4A673C6F92405AEEC1 /* ForegroundEstimator.swift in Sources */,
 				608283A26A218A730254A524 /* LightboxApp.swift in Sources */,
 				F988EF0E605103B57ACD25A1 /* MainView.swift in Sources */,
 				A753915C0953F3451E80C1F4 /* Nomos2_DAT2_x4.mlpackage in Sources */,

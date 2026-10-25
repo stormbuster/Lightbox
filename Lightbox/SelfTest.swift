@@ -46,9 +46,10 @@ enum SelfTest {
                 await time("warm-up") { await engine.warmUp() }
                 for model in AIModel.cutout {
                     let mask = try await time("matte \(model.rawValue)") { try await engine.matte(for: image, using: model) }
-                    let cut = try engine.composite(image, mask: mask)
+                    let cut = try await time("  composite (decontaminate)") { try engine.composite(image, mask: mask) }
                     try PhotoIO.write(cut, to: url.deletingPathExtension().appendingPathExtension("\(model.rawValue).png"), format: .png, metadata: metadata)
                 }
+                if args.contains("--cutout-only") { print("selftest ok"); exit(0) }
                 for model in AIModel.upscalers {
                     for factor in [2, 4] {
                         let up = try await time("upscale \(model.rawValue) \(factor)x") {

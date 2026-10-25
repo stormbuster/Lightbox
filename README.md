@@ -8,8 +8,8 @@ Apple silicon (GPU + Neural Engine). The app is sandboxed without network access
 
 | Task | Model | Licence | Runs on | Speed (M5 Pro) |
 |---|---|---|---|---|
-| Background, default | [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR), 2048 px | MIT | GPU | ~1.4 s per photo |
-| Background, hair/fur/glass | [BiRefNet_HR-matting](https://huggingface.co/ZhengPeng7/BiRefNet_HR-matting), 2048 px | MIT | GPU | ~1.4 s |
+| Background "Soft edges" (default) | [BiRefNet_HR-matting](https://huggingface.co/ZhengPeng7/BiRefNet_HR-matting), 2048 px | MIT | GPU | ~1.1 s per photo |
+| Background "Crisp edges" | [BiRefNet_HR](https://huggingface.co/ZhengPeng7/BiRefNet_HR), 2048 px | MIT | GPU | ~1.1 s |
 | Upscale "Restore" (default for JPEG/HEIC) | [4xBHI_dat2_real](https://github.com/Phhofm/models/releases/tag/4xBHI_dat2_real) | CC-BY-4.0 | GPU | ~10 s per input MP |
 | Upscale "Faithful" (default for RAW/TIFF/PNG) | [4xNomos2_hq_dat2](https://github.com/Phhofm/models/releases/tag/4xNomos2_hq_dat2) | CC-BY-4.0 | GPU | ~10 s per input MP |
 | Upscale "Fast" | [Real-ESRGAN x4plus](https://github.com/xinntao/Real-ESRGAN) | BSD-3 | Neural Engine | ~2.5 s per input MP |
@@ -18,6 +18,10 @@ Why these: BiRefNet is the state-of-the-art open model for high-resolution dicho
 architecture trained by Bria but CC BY-NC (non-commercial), so it was left out. DAT2 transformers give the most faithful photo detail;
 the BHI variant is trained on real degradations (JPEG/WebP compression, noise, blur), Nomos2-hq on clean images (it reproduces JPEG
 blocks on compressed input). 2× and 3× run the 4× model and resample each tile with Lanczos.
+
+Cutouts get foreground colour estimation (blur fusion, Forest et al. 2021, as in BiRefNet's `refine_foreground`), so
+soft edges lose the background colour that otherwise shows as a dark or coloured outline; ~0.9 s for 13.5 MP on Accelerate.
+Core Image's CIGuidedFilter was tried for edge-aware matte upsampling and rejected (it washed out the matte).
 
 Upscaling a cutout upscales the colour with the AI model and the alpha matte with a smooth resampler, so edges stay clean.
 Exports keep EXIF/GPS/IPTC metadata; JPEG exports of cutouts are flattened on white.
