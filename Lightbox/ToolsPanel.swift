@@ -152,7 +152,7 @@ struct ToolsPanel: View {
                 Picker("Format", selection: $editor.exportFormat) {
                     ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
                 }
-                .frame(width: 140)
+                .frame(width: 170)
                 Spacer()
                 Button("Save As…") { editor.saveWithPanel() }
                     .buttonStyle(.borderedProminent)
@@ -161,6 +161,13 @@ struct ToolsPanel: View {
             if editor.layer?.mask != nil && !editor.exportFormat.supportsAlpha {
                 Text("JPEG has no transparency; the cutout is saved on white.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            if editor.exportFormat == .psd {
+                Text(editor.layer?.mask != nil
+                     ? "Layers: the subject with an editable layer mask over the hidden original. Paint the mask in Photoshop, Affinity or Pixelmator to refine the cutout."
+                     : "One layer with the photo.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .disabled(editor.layer == nil || editor.isBusy)

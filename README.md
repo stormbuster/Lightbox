@@ -17,8 +17,9 @@ Core ML on the Apple silicon GPU and Neural Engine.
   matte through a smooth resampler.
 - **Compare**: *Original* shows the unedited photo (`\`), *Split* puts a before/after line on the photo that you drag
   across it (`⌘\`). Undo and Revert step back.
-- **Save As** PNG, TIFF, JPEG or HEIC, keeping EXIF, GPS and IPTC metadata. Cutouts keep their transparency (JPEG,
-  which has none, is saved on white).
+- **Save As** PNG, TIFF, JPEG or HEIC, keeping EXIF, GPS and IPTC metadata, or as a **layered PSD**: the subject
+  with the cutout as an editable layer mask over the hidden original photo, so the mask can be refined with a brush in
+  Photoshop, Affinity, Pixelmator or Photopea. Cutouts keep their transparency (JPEG, which has none, is saved on white).
 
 Camera, lens, focal length, aperture, shutter speed and ISO are read from EXIF and tune the background removal:
 shallow depth of field picks soft edges and widens the hair refinement, deep focus picks crisp edges, slow shutters
@@ -66,18 +67,18 @@ PSNR, ViTMatte within 0.05/255).
 
 ## How background removal works
 
-A 20 MP photo takes about 9 s, in stages (`Lightbox/Engine.swift`):
+A 20 MP photo takes about 3 s, in stages (`Lightbox/Engine.swift`):
 
-1. **Whole photo at 2048 px.** BiRefNet decides what the subject is.
-2. **Native-resolution edges.** On larger photos, fine hair is thinner than a pixel at 2048 px, so BiRefNet runs again
-   on full-resolution 2048 px tiles along the subject's edge; that detail is blended in only inside a band around the
-   stage-1 edge, so a tile's narrower view can't add or drop whole objects.
-3. **Hair matting** (*Soft edges*). A trimap is built from the segmentation (subject, background, and an unknown band
+1. **Whole photo at 2048 px.** BiRefNet decides what the subject is; its edges are soft but clean.
+2. **Hair matting** (*Soft edges*). A trimap is built from the segmentation (subject, background, and an unknown band
    that reaches further outwards, where flyaways are) and ViTMatte computes exact partial transparency inside the band
-   on native-resolution 1024 px tiles.
-4. **Clean-up.** Matting leaves a faint, smooth alpha haze beyond soft edges; alpha that is both faint and smooth is
+   on native-resolution 1024 px tiles. Its result is used only where it shows strand-like texture (hair, fur): on
+   smooth, out-of-focus edges such as arms and legs it leaves faint streaks of background, so stage 1 is kept there.
+   Re-running BiRefNet on native-resolution tiles was tried and dropped: a tile that sees only part of a limb loses
+   context and smears its edge.
+3. **Clean-up.** Matting leaves a faint, smooth alpha haze beyond soft edges; alpha that is both faint and smooth is
    faded out, strand-like detail is kept, and specks away from the subject are dropped.
-5. **Colour decontamination.** Edge pixels mix subject and background colour; blur-fusion foreground estimation
+4. **Colour decontamination.** Edge pixels mix subject and background colour; blur-fusion foreground estimation
    (`Lightbox/ForegroundEstimator.swift`, on Accelerate) recovers the subject's own colour so no outline of the old
    background remains.
 
@@ -111,7 +112,8 @@ C=~/Library/Containers/com.stormbuster.lightbox/Data/tmp; mkdir -p $C && cp phot
 build/Build/Products/Debug/Lightbox.app/Contents/MacOS/Lightbox --selftest $C/photo.jpg --cutout-only
 ```
 
-`LIGHTBOX_NOREFINE=1` and `LIGHTBOX_NOHAIR=1` skip stages 2 and 3 for comparisons.
+`LIGHTBOX_NOREFINE=1` returns the stage-1 matte as is, `LIGHTBOX_NOHAIR=1` skips the hair matting and
+`LIGHTBOX_RAW=1` skips the clean-up, for comparisons. The self-test also writes the layered PSD.
 
 ## Licence
 
@@ -125,6 +127,7 @@ Lightbox is MIT licensed (see `LICENSE`). The models keep their own licences, be
 - Real-ESRGAN by Xintao Wang et al., BSD-3-Clause.
 - Foreground estimation after Forest et al., "Approximate Fast Foreground Colour Estimation" (ICIP 2021), as in
   BiRefNet's `refine_foreground`.
+- The PSD writer follows Adobe's [Photoshop File Format Specification](https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/).
 - The borderless windows follow [stormbuster/borderless](https://github.com/stormbuster/borderless).
 - The screenshot's photo is from [Unsplash](https://unsplash.com) (Unsplash License).
 

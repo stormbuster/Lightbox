@@ -63,6 +63,8 @@ enum SelfTest {
                     let mask = try await time("matte \(model.rawValue)") { try await engine.matte(for: image, using: model) }
                     let cut = try await time("  composite (decontaminate)") { try engine.composite(image, mask: mask) }
                     try PhotoIO.write(cut, to: url.deletingPathExtension().appendingPathExtension("\(model.rawValue).png"), format: .png, metadata: metadata)
+                    let psd = try await time("  layered PSD") { try engine.layeredPSD(image, mask: mask) }
+                    try psd.write(to: url.deletingPathExtension().appendingPathExtension("\(model.rawValue).psd"))
                 }
                 if args.contains("--cutout-only") { print("selftest ok"); exit(0) }
                 for model in AIModel.upscalers {

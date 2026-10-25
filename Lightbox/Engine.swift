@@ -143,16 +143,14 @@ actor Engine {
     // MARK: Background removal
 
     /// Full-resolution alpha matte (8-bit linear gray) for the photo.
-    /// Full-resolution alpha matte (8-bit linear gray) for the photo.
     ///
-    /// Pass 1 sees the whole photo squeezed to the model's 2048 px, which decides what the subject is. On larger photos,
-    /// fine hair is thinner than a pixel at that scale, so pass 2 re-runs the model on native-resolution tiles along the
-    /// subject's edges and blends that detail in, only inside a band around the pass-1 edge (so a tile's narrower
-    /// context can't add or drop whole objects).
+    /// BiRefNet sees the whole photo at 2048 px and decides what the subject is; its edges are soft but clean. With
+    /// *Soft edges*, ViTMatte then works out hair at native resolution (`hairMatte`), and its result is used only where
+    /// it finds strand-like detail. (Re-running BiRefNet on native-resolution tiles was tried and dropped: a tile that
+    /// sees only part of a limb loses context and smears its edge.)
     func matte(for rgb: CGImage, using id: AIModel, tuning: CutoutTuning = .standard,
                progress: @Sendable (Double) -> Void = { _ in }) throws -> CGImage {
         let model = try model(id)
-        let tile = Int(inputSize(of: model).width)
         let (w, h) = (rgb.width, rgb.height)
         var source = CIImage(cgImage: rgb)
         if tuning.denoise {   // model input only; the photo's own pixels are untouched
@@ -165,56 +163,8 @@ actor Engine {
         #if DEBUG
         if ProcessInfo.processInfo.environment["LIGHTBOX_NOREFINE"] == "1" { return coarse }
         #endif
-        guard max(w, h) > tile * 5 / 4 else {
-            return try grayImage(removeHaze(plane(of: coarse, bounds: extent), width: w, height: h), width: w, height: h)
-        }
-        progress(0.1)
-
+        progress(0.2)
         var alpha = plane(of: coarse, bounds: extent)
-        // Band: everywhere near a soft or transitional pass-1 value, widened by ~2 % of the photo and feathered.
-        let soft = alpha.map { $0 > 0.02 && $0 < 0.98 ? Float(1) : 0 }
-        let reach = ForegroundEstimator.odd(Double(max(w, h)) * 0.02 * tuning.bandScale)
-        var band = vDSP.multiply(Float(6), ForegroundEstimator.blur(soft, w, h, reach))
-        vDSP.clip(band, to: 0...1, result: &band)
-
-        var detail = [Float](repeating: 0, count: w * h), weight = [Float](repeating: 0, count: w * h)
-        let overlap = tile / 8
-        let xs = starts(length: w, tile: tile, overlap: overlap), ys = starts(length: h, tile: tile, overlap: overlap)
-        var done = 0
-        for ty in ys {
-            for tx in xs {
-                try Task.checkCancellation()
-                done += 1
-                let rect = CGRect(x: tx, y: ty, width: min(tile, w), height: min(tile, h))
-                let (rw, rh) = (Int(rect.width), Int(rect.height))
-                let top = h - ty - rh                                   // bitmap row of the rect's top edge
-                var touchesBand = false
-                for r in stride(from: 0, to: rh, by: 8) where !touchesBand {
-                    let row = (top + r) * w + tx
-                    for c in stride(from: 0, to: rw, by: 8) where band[row + c] > 0 { touchesBand = true; break }
-                }
-                guard touchesBand else { continue }
-
-                let local = try predictMask(model, source: source, rect: rect, space: space)
-                let placed = resample(local, to: rect.size).transformed(by: CGAffineTransform(translationX: rect.minX, y: rect.minY))
-                let values = plane(of: placed, bounds: rect)
-                // Feather tile seams; image borders keep full weight.
-                for r in 0..<rh {
-                    let wy = feather(r, rh, overlap, atStart: ty + rh == h ? false : true, atEnd: ty == 0 ? false : true)
-                    for c in 0..<rw {
-                        let wx = feather(c, rw, overlap, atStart: tx > 0, atEnd: tx + rw < w)
-                        let i = (top + r) * w + tx + c
-                        let wt = wx * wy
-                        detail[i] += values[r * rw + c] * wt
-                        weight[i] += wt
-                    }
-                }
-                progress(0.1 + 0.5 * Double(done) / Double(xs.count * ys.count))
-            }
-        }
-        for i in 0..<alpha.count where weight[i] > 0 && band[i] > 0 {
-            alpha[i] += band[i] * (detail[i] / weight[i] - alpha[i])
-        }
         var hair = id == .birefnetMatting && min(w, h) >= 1024
         #if DEBUG
         if ProcessInfo.processInfo.environment["LIGHTBOX_NOHAIR"] == "1" { hair = false }
@@ -222,6 +172,9 @@ actor Engine {
         if hair {
             alpha = try hairMatte(alpha, source: source, space: space, width: w, height: h, tuning: tuning, progress: progress)
         }
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["LIGHTBOX_RAW"] == "1" { return try grayImage(alpha, width: w, height: h) }
+        #endif
         return try grayImage(removeHaze(alpha, width: w, height: h), width: w, height: h)
     }
 
@@ -301,11 +254,23 @@ actor Engine {
                         weight[i] += wt
                     }
                 }
-                progress(0.6 + 0.4 * Double(done) / Double(xs.count * ys.count))
+                progress(0.2 + 0.8 * Double(done) / Double(xs.count * ys.count))
             }
         }
         for i in 0..<result.count where weight[i] > 0 { result[i] = acc[i] / weight[i] }
-        return result
+
+        // Use ViTMatte only where its matte has strand-like texture (hair, fur). On smooth, out-of-focus edges such as
+        // arms and legs it leaves faint streaks of background, so the segmentation's clean soft edge is kept there.
+        // Measured on a 20 MP portrait: hair edges score 0.013-0.017, limbs 0.006-0.008.
+        let local = ForegroundEstimator.blur(result, w, h, 7, passes: 1)
+        let detail = vDSP.absolute(vDSP.subtract(result, local))
+        let energy = ForegroundEstimator.blur(detail, w, h, 41, passes: 1)
+        var blended = alpha
+        for i in 0..<alpha.count where weight[i] > 0 {
+            let t = min(max((energy[i] - 0.009) / 0.007, 0), 1)
+            blended[i] = alpha[i] + t * t * (3 - 2 * t) * (result[i] - alpha[i])
+        }
+        return blended
     }
 
     private func grayBuffer(_ size: Int) throws -> CVPixelBuffer {
@@ -457,23 +422,56 @@ actor Engine {
     /// Premultiplied cutout whose edge colours have the background's colour removed (see ForegroundEstimator).
     nonisolated private func decontaminated(_ rgb: CGImage, mask: CGImage, space: CGColorSpace) throws -> CIImage {
         let (w, h) = (rgb.width, rgb.height)
+        let (foreground, alpha) = try foregroundPlanes(rgb, mask: mask, space: space)
+        // Interleave as premultiplied RGBA (Core Image's convention for float bitmaps).
+        var planar = (0..<3).flatMap { vDSP.multiply(foreground[$0], alpha) } + alpha
+        var rgba = [Float](repeating: 0, count: w * h * 4)
+        try convert(&rgba, &planar, width: w, height: h, toPlanar: false)
+        let data = rgba.withUnsafeBytes { Data($0) }
+        return CIImage(bitmapData: data, bytesPerRow: w * 16, size: CGSize(width: w, height: h), format: .RGBAf, colorSpace: space)
+    }
+
+    /// The subject's own colours (background bleed removed) as three 0…1 planes, plus the matte as a plane.
+    nonisolated private func foregroundPlanes(_ rgb: CGImage, mask: CGImage, space: CGColorSpace) throws -> (rgb: [[Float]], alpha: [Float]) {
+        let (w, h) = (rgb.width, rgb.height)
         let n = w * h
         let extent = CGRect(x: 0, y: 0, width: w, height: h)
         var rgba = [Float](repeating: 0, count: n * 4)
         var alpha = [Float](repeating: 0, count: n)
         rgba.withUnsafeMutableBytes { context.render(CIImage(cgImage: rgb), toBitmap: $0.baseAddress!, rowBytes: w * 16, bounds: extent, format: .RGBAf, colorSpace: space) }
         alpha.withUnsafeMutableBytes { context.render(CIImage(cgImage: mask), toBitmap: $0.baseAddress!, rowBytes: w * 4, bounds: extent, format: .Lf, colorSpace: linearGray) }
-
         var planar = [Float](repeating: 0, count: n * 4)
         try convert(&rgba, &planar, width: w, height: h, toPlanar: true)
         let rgb3 = (0..<3).map { Array(planar[$0 * n..<($0 + 1) * n]) }
-        let foreground = ForegroundEstimator.estimate(rgb: rgb3, alpha: alpha, width: w, height: h)
+        return (ForegroundEstimator.estimate(rgb: rgb3, alpha: alpha, width: w, height: h), alpha)
+    }
 
-        // Re-interleave as premultiplied RGBA (Core Image's convention for float bitmaps).
-        planar = (0..<3).flatMap { vDSP.multiply(foreground[$0], alpha) } + alpha
-        try convert(&rgba, &planar, width: w, height: h, toPlanar: false)
-        let data = rgba.withUnsafeBytes { Data($0) }
-        return CIImage(bitmapData: data, bytesPerRow: w * 16, size: extent.size, format: .RGBAf, colorSpace: space)
+    /// Layered Photoshop document: the subject (background bleed removed) with the cutout as an editable layer mask,
+    /// over the hidden original photo. Without a matte, the photo alone.
+    nonisolated func layeredPSD(_ rgb: CGImage, mask: CGImage?) throws -> Data {
+        let space = workingSpace(rgb)
+        let (w, h) = (rgb.width, rgb.height)
+        let n = w * h
+        let extent = CGRect(x: 0, y: 0, width: w, height: h)
+        var rgba8 = [UInt8](repeating: 0, count: n * 4)
+        rgba8.withUnsafeMutableBytes { context.render(CIImage(cgImage: rgb), toBitmap: $0.baseAddress!, rowBytes: w * 4, bounds: extent, format: .RGBA8, colorSpace: space) }
+        let original = (0..<3).map { c in (0..<n).map { rgba8[$0 * 4 + c] } }
+        let icc = space.copyICCData() as Data?
+        guard let mask else {
+            return PSDWriter.data(width: w, height: h, layers: [.init(name: "Photo", rgb: original)], composite: original, iccProfile: icc)
+        }
+
+        let (foreground, alpha) = try foregroundPlanes(rgb, mask: mask, space: space)
+        func byte(_ v: Float) -> UInt8 { UInt8(max(0, min(255, (v * 255).rounded()))) }
+        // Where the subject is (even faintly) use its cleaned colours; elsewhere the original, so painting the mask
+        // back in reveals the real scene.
+        let subject = (0..<3).map { c in (0..<n).map { alpha[$0] > 0.01 ? byte(foreground[c][$0]) : original[c][$0] } }
+        let matte = alpha.map(byte)
+        let composite = (0..<3).map { c in (0..<n).map { byte(foreground[c][$0] * alpha[$0] + (1 - alpha[$0])) } }   // on white
+        return PSDWriter.data(width: w, height: h, layers: [
+            .init(name: "Original photo", rgb: original, hidden: true),
+            .init(name: "Subject", rgb: subject, mask: matte),
+        ], composite: composite, iccProfile: icc)
     }
 
     /// RGBA float pixels ⇄ four consecutive planes (vImage's "ARGB" naming is positional, so RGBA order works too).

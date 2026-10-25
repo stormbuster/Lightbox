@@ -23,6 +23,7 @@
 		BA7E2667A33D6003932BB71F /* BiRefNet_HR_Matting_2048.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 08BE21612DD857B660A9AB51 /* BiRefNet_HR_Matting_2048.mlpackage */; };
 		D4A85AF8B940475AF5537D43 /* SelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4BCF37F596B36103F8E541D /* SelfTest.swift */; };
 		D7D6C0D9F9F4BA2B14CD0C60 /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1250E5EE4EC41817C64FD2AB /* Engine.swift */; };
+		E532056AABA44878D5D58734 /* PSDWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202F1096E0F5EC8EB08EA994 /* PSDWriter.swift */; };
 		F747487C6BFED2FDA707F0DA /* ShootingInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */; };
 		F988EF0E605103B57ACD25A1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */; };
 /* End PBXBuildFile section */
@@ -30,6 +31,7 @@
 /* Begin PBXFileReference section */
 		08BE21612DD857B660A9AB51 /* BiRefNet_HR_Matting_2048.mlpackage */ = {isa = PBXFileReference; path = BiRefNet_HR_Matting_2048.mlpackage; sourceTree = "<group>"; };
 		1250E5EE4EC41817C64FD2AB /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
+		202F1096E0F5EC8EB08EA994 /* PSDWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PSDWriter.swift; sourceTree = "<group>"; };
 		336171D542D9D56A9F0ABD95 /* BiRefNet_HR_2048.mlpackage */ = {isa = PBXFileReference; path = BiRefNet_HR_2048.mlpackage; sourceTree = "<group>"; };
 		3D8A2E4268B3A8916ED623DA /* Lightbox.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Lightbox.entitlements; sourceTree = "<group>"; };
 		4E89ADA0AE57DC9C3AE176C4 /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 				8BAA2BF5CC36CBC364E43EF9 /* LightboxApp.swift */,
 				AA79FABA43EBE4AD3EBC5FA7 /* MainView.swift */,
 				E442D36436F2B39D56C1EB21 /* PhotoIO.swift */,
+				202F1096E0F5EC8EB08EA994 /* PSDWriter.swift */,
 				D4BCF37F596B36103F8E541D /* SelfTest.swift */,
 				DFE45B55E46F9E7D4D635C24 /* ShootingInfo.swift */,
 				A28AD9677F343321B9A56669 /* ToolsPanel.swift */,
@@ -180,6 +183,7 @@
 				608283A26A218A730254A524 /* LightboxApp.swift in Sources */,
 				F988EF0E605103B57ACD25A1 /* MainView.swift in Sources */,
 				A753915C0953F3451E80C1F4 /* Nomos2_DAT2_x4.mlpackage in Sources */,
+				E532056AABA44878D5D58734 /* PSDWriter.swift in Sources */,
 				57CAA69D9E73B4075D94ACC8 /* PhotoIO.swift in Sources */,
 				12C349D1CBA3A7FB44DE1BE8 /* RealESRGAN_x4.mlpackage in Sources */,
 				D4A85AF8B940475AF5537D43 /* SelfTest.swift in Sources */,

@@ -45,12 +45,12 @@ nonisolated enum ForegroundEstimator {
         return (outF, outB)
     }
 
-    /// Separable box blur, applied twice (≈ tent filter, avoids box artefacts at large radii). Edges are extended.
-    static func blur(_ plane: [Float], _ width: Int, _ height: Int, _ kernel: Int) -> [Float] {
+    /// Separable box blur, by default applied twice (≈ tent filter, avoids box artefacts at large radii). Edges are extended.
+    static func blur(_ plane: [Float], _ width: Int, _ height: Int, _ kernel: Int, passes: Int = 2) -> [Float] {
         var a = plane
         var b = [Float](repeating: 0, count: plane.count)
         let r = kernel / 2
-        for _ in 0..<2 {
+        for _ in 0..<passes {
             boxRows(a, into: &b, width: width, height: height, radius: r)
             vDSP_mtrans(b, 1, &a, 1, vDSP_Length(width), vDSP_Length(height))    // a = bᵀ (height × width → width × height)
             boxRows(a, into: &b, width: height, height: width, radius: r)

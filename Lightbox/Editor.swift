@@ -146,9 +146,13 @@ final class Editor {
 
         let metadata = metadata
         perform("Saving…", record: false) {
-            let flatten = format.supportsAlpha ? nil : CGColor(gray: 1, alpha: 1)
-            let image = try Engine.shared.composite(layer.rgb, mask: layer.mask, flattenOnto: flatten)
-            try PhotoIO.write(image, to: url, format: format, metadata: metadata)
+            if format == .psd {
+                try Engine.shared.layeredPSD(layer.rgb, mask: layer.mask).write(to: url, options: .atomic)
+            } else {
+                let flatten = format.supportsAlpha ? nil : CGColor(gray: 1, alpha: 1)
+                let image = try Engine.shared.composite(layer.rgb, mask: layer.mask, flattenOnto: flatten)
+                try PhotoIO.write(image, to: url, format: format, metadata: metadata)
+            }
             return { _ in layer }
         }
     }

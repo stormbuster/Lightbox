@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 
 
 nonisolated enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
-    case png = "PNG", tiff = "TIFF", jpeg = "JPEG", heic = "HEIC"
+    case png = "PNG", tiff = "TIFF", jpeg = "JPEG", heic = "HEIC", psd = "PSD (layers)"
 
     var id: String { rawValue }
 
@@ -21,10 +21,11 @@ nonisolated enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
         case .tiff: .tiff
         case .jpeg: .jpeg
         case .heic: .heic
+        case .psd: UTType(filenameExtension: "psd") ?? .image
         }
     }
 
-    var supportsAlpha: Bool { self == .png || self == .tiff || self == .heic }
+    var supportsAlpha: Bool { self != .jpeg }
 }
 
 
