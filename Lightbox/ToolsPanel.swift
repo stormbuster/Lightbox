@@ -1,0 +1,131 @@
+//
+//  ToolsPanel.swift
+//  Lightbox
+//
+
+import SwiftUI
+
+
+struct ToolsPanel: View {
+    @Environment(Editor.self) private var editor
+
+    var body: some View {
+        @Bindable var editor = editor
+
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Model", selection: $editor.cutoutModel) {
+                        ForEach(AIModel.cutout) { Text($0.title).tag($0) }
+                    }
+                    Text(editor.cutoutModel.detail)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        editor.removeBackground()
+                    } label: {
+                        Label("Remove Background", systemImage: "person.and.background.dotted")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.large)
+                }
+                .padding(4)
+            } label: {
+                Text("Background").font(.headline)
+            }
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Model", selection: $editor.upscaleModel) {
+                        ForEach(AIModel.upscalers) { Text($0.title).tag($0) }
+                    }
+                    Text(editor.upscaleModel.detail)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Picker("Scale", selection: $editor.upscaleFactor) {
+                        ForEach([2, 3, 4], id: \.self) { Text("\($0)×").tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if let size = editor.layer?.pixelSize {
+                        Text("→ \(Int(size.width) * editor.upscaleFactor) × \(Int(size.height) * editor.upscaleFactor) px")
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    Button {
+                        editor.upscale()
+                    } label: {
+                        Label("Upscale", systemImage: "arrow.up.left.and.arrow.down.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .controlSize(.large)
+                }
+                .padding(4)
+            } label: {
+                Text("Upscale").font(.headline)
+            }
+
+            if editor.isBusy {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let progress = editor.progress {
+                        ProgressView(value: progress)
+                    } else {
+                        ProgressView().progressViewStyle(.linear)
+                    }
+                    HStack {
+                        Text(editor.status).font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Cancel") { editor.cancel() }.controlSize(.small)
+                    }
+                }
+            }
+
+            HStack {
+                Button("Undo", systemImage: "arrow.uturn.backward") { editor.undo() }
+                    .disabled(!editor.canUndo)
+                Button("Revert") { editor.revert() }
+                    .disabled(!editor.isModified)
+                Spacer()
+                Text("Hold to compare")
+                    .font(.caption)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(editor.showOriginal ? Color.accentColor.opacity(0.3) : Color.secondary.opacity(0.15),
+                                in: Capsule())
+                    .onLongPressGesture(minimumDuration: .infinity, pressing: { editor.showOriginal = $0 }, perform: {})
+                    .disabled(!editor.isModified)
+            }
+
+            Divider()
+
+            HStack {
+                Picker("Format", selection: $editor.exportFormat) {
+                    ForEach(ExportFormat.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .frame(width: 140)
+                Spacer()
+                Button("Save As…") { editor.saveWithPanel() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut("s")
+            }
+            if editor.layer?.mask != nil && !editor.exportFormat.supportsAlpha {
+                Text("JPEG has no transparency; the cutout is saved on white.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .disabled(editor.layer == nil || editor.isBusy)
+        .padding(16)
+        .frame(width: 320)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(editor.sourceURL?.lastPathComponent ?? "No photo")
+                .font(.headline).lineLimit(1).truncationMode(.middle)
+            if let layer = editor.layer {
+                Text("\(layer.rgb.width) × \(layer.rgb.height) px" + (layer.mask != nil ? " · transparent background" : ""))
+                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+        }
+    }
+}

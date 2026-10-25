@@ -1,0 +1,38 @@
+name: Lightbox
+options:
+  bundleIdPrefix: com.stormbuster
+  deploymentTarget:
+    macOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ARCHS: arm64
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_IDENTITY: "-"
+    COREML_CODEGEN_LANGUAGE: None
+targets:
+  Lightbox:
+    type: application
+    platform: macOS
+    sources:
+      - Lightbox
+    info:
+      path: Lightbox/Info.plist
+      properties:
+        CFBundleDisplayName: Lightbox
+        LSApplicationCategoryType: public.app-category.photography
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Image
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.image]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stormbuster.lightbox
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: Lightbox/Lightbox.entitlements

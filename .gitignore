@@ -1,0 +1,9 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+tools/.venv/
+tools/cache/
+Lightbox/Models/*.mlpackage
+__pycache__/
